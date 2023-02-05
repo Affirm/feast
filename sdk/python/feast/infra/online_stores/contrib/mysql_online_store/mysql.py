@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import pymysql
 import pytz
+from enum import Enum
 from pydantic import StrictStr
 from pymysql.connections import Connection
 from pymysql.cursors import Cursor
@@ -30,6 +31,11 @@ class MySQLOnlineStoreConfig(FeastConfigBaseModel):
     password: Optional[StrictStr] = None
     database: Optional[StrictStr] = None
     port: Optional[int] = None
+
+
+class ReleaseMode(Enum):
+    overwrite = 'overwrite'
+    update = 'update'
 
 
 class MySQLOnlineStore(OnlineStore):
@@ -273,6 +279,10 @@ class MySQLOnlineStore(OnlineStore):
                 created_ts timestamp NULL DEFAULT NULL,
                 PRIMARY KEY(entity_key, feature_name))"""
             )
+            release_mode = ReleaseMode.update if 'release_mode' not in table.tags \
+                else ReleaseMode(table.tags['release_mode'])
+            if release_mode == ReleaseMode.overwrite:
+                cur.execute(f'DELETE FROM {_table_id(project, table)}')
 
             cur.execute(
                 f"SHOW INDEXES FROM {_table_id(project, table)};"
@@ -281,7 +291,10 @@ class MySQLOnlineStore(OnlineStore):
             index_exists = False
             for index in cur.fetchall():
                 if index[2] == f"{_table_id(project, table)}_ek":
-                    index_exists = True
+                    if release_mode == ReleaseMode.overwrite:
+                        cur.execute(f"DROP INDEX {table_name}_ek ON {table_name};")
+                    else:
+                        index_exists = True
                     break
 
             if not index_exists:
