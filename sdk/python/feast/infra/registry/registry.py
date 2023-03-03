@@ -444,6 +444,13 @@ class Registry(BaseRegistry):
         )
         return proto_registry_utils.list_stream_feature_views(registry_proto, project)
 
+    def list_stream_feature_view_names(
+        self, project: str, allow_cache: bool = False
+    ) -> List[str]:
+        return _get_feature_view_names(
+            self.list_stream_feature_views(project, allow_cache)
+        )
+
     def list_on_demand_feature_views(
         self, project: str, allow_cache: bool = False
     ) -> List[OnDemandFeatureView]:
@@ -452,6 +459,13 @@ class Registry(BaseRegistry):
         )
         return proto_registry_utils.list_on_demand_feature_views(
             registry_proto, project
+        )
+
+    def list_on_demand_feature_view_names(
+        self, project: str, allow_cache: bool = False
+    ) -> List[str]:
+        return _get_feature_view_names(
+            self.list_on_demand_feature_views(project, allow_cache)
         )
 
     def get_on_demand_feature_view(
@@ -531,6 +545,12 @@ class Registry(BaseRegistry):
 
         raise FeatureViewNotFoundException(feature_view.name, project)
 
+    def _get_feature_view_names(feature_view_list = List[FeatureView]) -> List[str]:
+        feature_view_names =[]
+        for feature_view in feature_view_list:
+            feature_view_names.append(feature_view.name)
+        return feature_view_names
+
     def list_feature_views(
         self, project: str, allow_cache: bool = False
     ) -> List[FeatureView]:
@@ -538,6 +558,11 @@ class Registry(BaseRegistry):
             project=project, allow_cache=allow_cache
         )
         return proto_registry_utils.list_feature_views(registry_proto, project)
+    
+    def list_feature_view_names(
+        self, project: str, allow_cache: bool = False
+    ) -> List[str]:
+        return _get_feature_view_names(self.list_feature_views(project, allow_cache))
 
     def get_request_feature_view(self, name: str, project: str):
         registry_proto = self._get_registry_proto(project=project, allow_cache=False)
