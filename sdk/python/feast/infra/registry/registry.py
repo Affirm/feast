@@ -60,6 +60,7 @@ REGISTRY_STORE_CLASS_FOR_TYPE = {
     "FileRegistryStore": "feast.infra.registry.file.FileRegistryStore",
     "PostgreSQLRegistryStore": "feast.infra.registry.contrib.postgres.postgres_registry_store.PostgreSQLRegistryStore",
     "AzureRegistryStore": "feast.infra.registry.contrib.azure.azure_registry_store.AzBlobRegistryStore",
+    "MySQLRegistryStore": "feast.infra.registry.contrib.mysql.mysql_registry_store.MySQLRegistryStore",
 }
 
 REGISTRY_STORE_CLASS_FOR_SCHEME = {
