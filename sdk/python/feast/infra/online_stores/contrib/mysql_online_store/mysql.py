@@ -115,11 +115,6 @@ class MySQLOnlineStore(OnlineStore):
                         val.SerializeToString(),
                         timestamp,
                         created_ts,
-
-                        # Update on duplicate key
-                        val.SerializeToString(),
-                        timestamp,
-                        created_ts,
                     )
                 )
 
@@ -134,9 +129,9 @@ class MySQLOnlineStore(OnlineStore):
                 (entity_key, feature_name, value, event_ts, created_ts)
                 values (%s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
-                value = %s,
-                event_ts = %s,
-                created_ts = %s;
+                value = values(value),
+                event_ts = values(event_ts),
+                created_ts = values(created_ts);
                 """,
                 insertion_batch
             )
