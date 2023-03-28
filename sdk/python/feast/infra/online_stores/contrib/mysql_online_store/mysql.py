@@ -135,7 +135,6 @@ class MySQLOnlineStore(OnlineStore):
     ) -> None:
         raw_conn, conn_type = self._get_conn(config)
         conn = raw_conn.connection if conn_type == ConnectionType.SESSION else raw_conn
-        write_retries = 4
         with conn.cursor() as cur:
             project = config.project
 
@@ -160,11 +159,11 @@ class MySQLOnlineStore(OnlineStore):
                         event_ts = VALUES(event_ts),
                         created_ts = VALUES(created_ts)
                         """
-                values = [item for row in rows_to_insert for item in row]
+                query_values = [item for row in rows_to_insert for item in row]
                 self._execute_query_with_retry(cur=cur,
                                                conn=conn,
                                                query=query,
-                                               values=values,
+                                               values=query_values,
                                                retries=MYSQL_WRITE_RETRIES)
         self._close_conn(raw_conn, conn_type)
 
@@ -205,6 +204,8 @@ class MySQLOnlineStore(OnlineStore):
                         result.append((None, None))
                     else:
                         result.append((res_ts, res))
+                else:
+                    logging.error(f'Skipping read for (entity, table)): ({entity_key}, {_table_id(project, table)})')
         self._close_conn(raw_conn, conn_type)
         return result
 
