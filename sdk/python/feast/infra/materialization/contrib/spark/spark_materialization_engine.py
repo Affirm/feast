@@ -10,6 +10,9 @@ except ImportError:
 
 import pandas as pd
 import pyarrow
+import dill
+dill.extend(False)
+
 from tqdm import tqdm
 
 from feast.batch_feature_view import BatchFeatureView
@@ -219,8 +222,7 @@ class _SparkSerializedArtifacts:
 
     @classmethod
     def serialize(cls, feature_view, repo_config):
-        import dill
-
+        dill.extend(True)
         # get the feature view type
         if isinstance(feature_view, StreamFeatureView):
             feature_view_type = "stream_feature_view"
@@ -233,6 +235,7 @@ class _SparkSerializedArtifacts:
         # serialize repo_config to disk. Will be used to instantiate the online store
         repo_config_byte = dill.dumps(repo_config)
 
+        dill.extend(False)
         return _SparkSerializedArtifacts(
             feature_view_type=feature_view_type,
             feature_view_proto=feature_view_proto,
@@ -240,8 +243,7 @@ class _SparkSerializedArtifacts:
         )
 
     def unserialize(self):
-        import dill
-
+        dill.extend(True)
         # unserialize
         if self.feature_view_type == "stream_feature_view":
             proto = StreamFeatureViewProto()
@@ -257,6 +259,7 @@ class _SparkSerializedArtifacts:
 
         provider = PassthroughProvider(repo_config)
         online_store = provider.online_store
+        dill.extend(False)
         return feature_view, online_store, repo_config
 
 
