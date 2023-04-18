@@ -8,7 +8,6 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-import dill
 import pandas as pd
 import pyarrow
 from tqdm import tqdm
@@ -194,11 +193,6 @@ class SparkMaterializationEngine(BatchMaterializationEngine):
             else:
                 print(f"start materializing {num_rows} rows to online store")
 
-            import dill
-            dill.extend(False)
-            import cloudpickle
-            dill.extend(True)
-
             spark_df.foreachPartition(
                 lambda x: _process_by_partition(x, spark_serialized_artifacts)
             )
@@ -225,6 +219,7 @@ class _SparkSerializedArtifacts:
 
     @classmethod
     def serialize(cls, feature_view, repo_config):
+        import dill
 
         # get the feature view type
         if isinstance(feature_view, StreamFeatureView):
@@ -245,6 +240,8 @@ class _SparkSerializedArtifacts:
         )
 
     def unserialize(self):
+        import dill
+
         # unserialize
         if self.feature_view_type == "stream_feature_view":
             proto = StreamFeatureViewProto()
