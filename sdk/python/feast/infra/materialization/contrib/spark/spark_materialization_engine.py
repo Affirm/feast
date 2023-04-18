@@ -194,7 +194,11 @@ class SparkMaterializationEngine(BatchMaterializationEngine):
             else:
                 print(f"start materializing {num_rows} rows to online store")
 
+            import dill
             dill.extend(False)
+            import cloudpickle
+            dill.extend(True)
+
             spark_df.foreachPartition(
                 lambda x: _process_by_partition(x, spark_serialized_artifacts)
             )
