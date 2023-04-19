@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable, List, Optional, Sequence, Union
@@ -8,7 +9,6 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-import dill
 import pandas as pd
 import pyarrow
 from tqdm import tqdm
@@ -194,7 +194,6 @@ class SparkMaterializationEngine(BatchMaterializationEngine):
             else:
                 print(f"start materializing {num_rows} rows to online store")
 
-            dill.extend(False)
             spark_df.foreachPartition(
                 lambda x: _process_by_partition(x, spark_serialized_artifacts)
             )
@@ -232,7 +231,7 @@ class _SparkSerializedArtifacts:
         feature_view_proto = feature_view.to_proto().SerializeToString()
 
         # serialize repo_config to disk. Will be used to instantiate the online store
-        repo_config_byte = dill.dumps(repo_config)
+        repo_config_byte = repo_config.json()
 
         return _SparkSerializedArtifacts(
             feature_view_type=feature_view_type,
@@ -245,14 +244,16 @@ class _SparkSerializedArtifacts:
         if self.feature_view_type == "stream_feature_view":
             proto = StreamFeatureViewProto()
             proto.ParseFromString(self.feature_view_proto)
-            feature_view = StreamFeatureView.from_proto(proto)
+            feature_view = StreamFeatureView.from_proto(proto, skip_udf=True)
         else:
             proto = FeatureViewProto()
             proto.ParseFromString(self.feature_view_proto)
             feature_view = FeatureView.from_proto(proto)
 
         # load
-        repo_config = dill.loads(self.repo_config_byte)
+        repo_config = RepoConfig.parse_obj(
+            json.loads(self.repo_config_byte)
+        )
 
         provider = PassthroughProvider(repo_config)
         online_store = provider.online_store
