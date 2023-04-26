@@ -190,8 +190,6 @@ class MySQLOnlineStore(OnlineStore):
 
         with conn.cursor() as cur:
             project = config.project
-            _drop_table_and_index(cur, project, table)
-            conn.commit()
 
             for i in range(0, len(data), batch_size):
                 logging.info(f'Inserting batch {batch} of {batch_size}....')
