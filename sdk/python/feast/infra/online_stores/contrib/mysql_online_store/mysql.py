@@ -190,8 +190,11 @@ class MySQLOnlineStore(OnlineStore):
 
         with conn.cursor() as cur:
             project = config.project
+            _drop_table_and_index(cur, project, table)
+            conn.commit()
+
             for i in range(0, len(data), batch_size):
-                print(f'Inserting batch {batch} of {batch_size}....')
+                logging.info(f'Inserting batch {batch} of {batch_size}....')
                 start = time.time()
                 batch = data[i:i + batch_size]
                 rows_to_insert = []
@@ -215,7 +218,7 @@ class MySQLOnlineStore(OnlineStore):
                 cur.execute(query)
                 conn.commit()
                 end = time.time()
-                print(f'batch elapsed time: {end - start}')
+                logging.info(f'batch elapsed time: {end - start}')
 
     def online_read(
             self,
