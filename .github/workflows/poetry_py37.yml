@@ -1,6 +1,9 @@
 name: Build Python 3.7 with Poetry
-on: push
-
+on: 
+  push:
+    branches: 
+      - affirm
+      - 0.28-affirm
 jobs:
   test:
     runs-on: ubuntu-latest
