@@ -1634,7 +1634,6 @@ x
         full_feature_names: bool = False,
         native_entity_values: bool = True,
         allow_registry_cache: bool = True,
-        apply_udfs_per_row: bool = True
     ):
         # Extract Sequence from RepeatedValue Protobuf.
         entity_value_lists: Dict[str, Union[List[Any], List[Value]]] = {
