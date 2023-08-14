@@ -39,7 +39,6 @@ import pyarrow as pa
 from colorama import Fore, Style
 from google.protobuf.timestamp_pb2 import Timestamp
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor
 
 from feast import feature_server, flags_helper, ui_server, utils
 from feast.base_feature_view import BaseFeatureView
@@ -2207,24 +2206,24 @@ x
             if odfv.mode == "python":
                 if initial_response_dict is None:
                     initial_response_dict = initial_response.to_dict()
-                transformed_features = odfv.get_transformed_features(
+                transformed_features = odfv.get_transformed_features_dict(
                     initial_response_dict,
                     full_feature_names
                 )
+                feature_names = transformed_features
             elif odfv.mode == "pandas":
                 if initial_response_df is None:
                     initial_response_df = initial_response.to_df()
-                transformed_features = odfv.get_transformed_features(
+                transformed_features = odfv.get_transformed_features_df(
                     initial_response_df,
                     full_feature_names
                 )
+                feature_names = transformed_features.columns
             else:
                 raise Exception(f'Invalid OnDemandFeatureMode: {odfv.mode}. Expected one of "pandas" or "python".')
 
-            columns = transformed_features.columns \
-                if isinstance(transformed_features, pd.DataFrame) else transformed_features
             selected_subset = [
-                f for f in columns if f in _feature_refs
+                f for f in feature_names if f in _feature_refs
             ]
 
             proto_values = []
