@@ -335,7 +335,7 @@ class DataSource(ABC):
         """
         raise NotImplementedError
 
-    def get_table_query_string(self) -> str:
+    def get_table_query_string(self, **kwargs) -> str:
         """
         Returns a string that can directly be used to reference this table in SQL.
         """
@@ -496,7 +496,7 @@ class KafkaSource(DataSource):
     def source_datatype_to_feast_value_type() -> Callable[[str], ValueType]:
         return type_map.redshift_to_feast_value_type
 
-    def get_table_query_string(self) -> str:
+    def get_table_query_string(self, **kwargs) -> str:
         raise NotImplementedError
 
 
