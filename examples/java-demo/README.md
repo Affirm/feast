@@ -1,5 +1,5 @@
 
-# Running Feast Java Server with Redis & calling with python (with registry in GCP)
+# Running Feast Java Server with Redis & calling with python (with registry in GCP)test
 
 For this tutorial, we setup Feast with Redis, using the Feast CLI to register and materialize features, and then retrieving via a Feast Java server deployed in Kubernetes via a gRPC call.
 > :point_right: for tips on how to run and debug this locally without using Kubernetes, see [java/serving/README.md](https://github.com/feast-dev/feast/blob/master/java/serving/README.md)
