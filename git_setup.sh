@@ -15,11 +15,11 @@ GITHUB_PAT=""
 GITHUB_EMAIL=""
 GITHUB_USERNAME=""
 
-read -p "Enter your Github Personal Access Token: " GITHUB_PAT
+read -rp "Enter your Github Personal Access Token: " GITHUB_PAT
 
-read -p "Enter your Github email address: " GITHUB_EMAIL
+read -rp "Enter your Github email address: " GITHUB_EMAIL
 
-read -p "Enter your Github username: " GITHUB_USERNAME
+read -rp "Enter your Github username: " GITHUB_USERNAME
 
 
 # Run git setup commands
