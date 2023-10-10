@@ -1,0 +1,2 @@
+class RegistryError(Exception):
+    pass
