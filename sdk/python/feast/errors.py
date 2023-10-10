@@ -5,6 +5,7 @@ from colorama import Fore, Style
 from feast.field import Field
 
 
+
 class DataSourceNotFoundException(Exception):
     def __init__(self, path):
         super().__init__(
@@ -115,6 +116,13 @@ class ValidationReferenceNotFound(FeastObjectNotFoundException):
     def __init__(self, name: str, project: str):
         super().__init__(
             f"Validation reference {name} does not exist in project {project}"
+        )
+
+
+class DuplicateValidationReference(Exception):
+    def __init__(self, name: str, project) -> None:
+        super(DuplicateValidationReference, self).__init__(
+            f"Duplication validation reference {name} for project {project}."
         )
 
 
@@ -411,3 +419,25 @@ class EntityDFNotDateTime(Exception):
 class PushSourceNotFoundException(Exception):
     def __init__(self, push_source_name: str):
         super().__init__(f"Unable to find push source '{push_source_name}'.")
+
+
+class RegistryNotBuiltException(Exception):
+    def __init__(self, registry_name: str) -> None:
+        super(RegistryNotBuiltException, self).__init__(f"Registry {registry_name} must be built before being queried.")
+
+
+class EntityNameCollisionException(Exception):
+    def __init__(self, entity_name: str, project: str) -> None:
+        super(EntityNameCollisionException, self).__init__(f"Duplicate entity {entity_name} for project {project}.")
+
+
+class FeatureServiceNameCollisionException(Exception):
+    def __init__(self, service_name: str, project: str) -> None:
+        super(FeatureServiceNameCollisionException, self).__init__(
+            f"Duplicate feature service {service_name} for project {project}."
+        )
+
+
+class MissingInfraObjectException(Exception):
+    def __init__(self, project: str) -> None:
+        super(MissingInfraObjectException, self).__init__(f"No infra objects found for project {project}.")

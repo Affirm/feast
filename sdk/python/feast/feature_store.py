@@ -81,6 +81,7 @@ from feast.infra.provider import Provider, RetrievalJob, get_provider
 from feast.infra.registry.base_registry import BaseRegistry
 from feast.infra.registry.registry import Registry
 from feast.infra.registry.sql import SqlRegistry
+from feast.infra.registry.memory import MemoryRegistry
 from feast.on_demand_feature_view import OnDemandFeatureView
 from feast.online_response import OnlineResponse
 from feast.protos.feast.serving.ServingService_pb2 import (
@@ -167,15 +168,23 @@ class FeatureStore:
                 self.repo_path, utils.get_default_yaml_file_path(self.repo_path)
             )
 
+        self._provider = get_provider(self.config)
+
+        # RB: ordering matters here because `apply_total` assumes a constructed `FeatureStore` instance
         registry_config = self.config.get_registry_config()
         if registry_config.registry_type == "sql":
             self._registry = SqlRegistry(registry_config, None, is_feast_apply=is_feast_apply)
+        elif registry_config.registry_type == "memory":
+            from feast.repo_operations import apply_total
+            self._registry = MemoryRegistry(registry_config, repo_path, is_feast_apply=is_feast_apply)
+
+            # RB: MemoryRegistry is stateless, meaning we'll need to call `apply` with each new FeatureStore instance
+            if not is_feast_apply:
+                apply_total(repo_config=self.config, repo_path=self.repo_path, skip_source_validation=False, store=self)
         else:
             r = Registry(registry_config, repo_path=self.repo_path)
             r._initialize_registry(self.config.project)
             self._registry = r
-
-        self._provider = get_provider(self.config)
 
     @log_exceptions
     def version(self) -> str:
@@ -212,6 +221,10 @@ class FeatureStore:
         downloaded synchronously, which may increase latencies if the triggering method is get_online_features().
         """
         registry_config = self.config.get_registry_config()
+
+        # RB: MemoryRegistry is a cache
+        if registry_config.registry_type == "memory":
+            return
         registry = Registry(registry_config, repo_path=self.repo_path)
         registry.refresh(self.config.project)
 

@@ -13,7 +13,7 @@ from sqlalchemy import (  # type: ignore
     String,
     Table,
     create_engine,
-    delete,''
+    delete,
     insert,
     select,
     update,

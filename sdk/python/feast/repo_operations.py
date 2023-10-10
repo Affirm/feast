@@ -7,7 +7,7 @@ import sys
 from importlib.abc import Loader
 from importlib.machinery import ModuleSpec
 from pathlib import Path
-from typing import List, Set, Union
+from typing import List, Set, Union, Tuple, Optional
 
 import click
 from click.exceptions import BadParameter
@@ -16,6 +16,7 @@ from feast import PushSource
 from feast.batch_feature_view import BatchFeatureView
 from feast.data_source import DataSource, KafkaSource, KinesisSource
 from feast.diff.registry_diff import extract_objects_for_keep_delete_update_add
+from feast.infra.registry.base_registry import BaseRegistry
 from feast.entity import Entity
 from feast.feature_service import FeatureService
 from feast.feature_store import FeatureStore
@@ -219,8 +220,11 @@ def plan(repo_config: RepoConfig, repo_path: Path, skip_source_validation: bool)
     click.echo(infra_diff.to_string())
 
 
-def _prepare_registry_and_repo(repo_config, repo_path, is_feast_apply=False):
-    store = FeatureStore(config=repo_config, is_feast_apply=is_feast_apply)
+def _prepare_registry_and_repo(
+    repo_config: RepoConfig, repo_path: Path, is_feast_apply: bool = False, store: Optional[FeatureStore] = None
+) -> Tuple[str, BaseRegistry, RepoContents, FeatureStore]:
+    if store is None:
+        store = FeatureStore(config=repo_config, is_feast_apply=is_feast_apply)
     project = store.project
     if not is_valid_name(project):
         print(
@@ -331,9 +335,13 @@ def log_infra_changes(
 
 
 @log_exceptions_and_usage
-def apply_total(repo_config: RepoConfig, repo_path: Path, skip_source_validation: bool):
+def apply_total(
+        repo_config: RepoConfig, repo_path: Path, skip_source_validation: bool, store: Optional[FeatureStore] = None
+) -> None:
     os.chdir(repo_path)
-    project, registry, repo, store = _prepare_registry_and_repo(repo_config, repo_path, is_feast_apply=True)
+    project, registry, repo, store = _prepare_registry_and_repo(
+        repo_config, repo_path, is_feast_apply=True, store=store
+    )
     apply_total_with_repo_instance(
         store, project, registry, repo, skip_source_validation
     )
