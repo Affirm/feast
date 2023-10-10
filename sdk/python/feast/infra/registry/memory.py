@@ -126,6 +126,7 @@ class MemoryRegistry(BaseRegistry):
         raise FeatureViewNotFoundException(feature_view)
 
     def _maybe_init_project_metadata(self, project: str) -> None:
+        # updates `usage` project uuid to match requested project
         if project not in self.project_metadata:
             self.project_metadata[project] = ProjectMetadata(project_name=project)
         usage.set_current_project_uuid(self.project_metadata[project].project_uuid)
@@ -133,9 +134,9 @@ class MemoryRegistry(BaseRegistry):
     def _delete_object(
         self, name: str, project: str, registry: Dict[str, FeastResource], on_miss_exc: Exception
     ) -> None:
+        # deletes a key from `registry`, or `on_miss_exc` is raised if the object doesn't exist in the registry
         self._maybe_init_project_metadata(project)
 
-        # deletes a key from `registry`, or `on_miss_exc` is raised if the object doesn't exist in the registry
         key = project_key(project, name)
         if key not in registry:
             raise on_miss_exc
@@ -144,9 +145,9 @@ class MemoryRegistry(BaseRegistry):
     def _get_object(
         self, name: str, project: str, registry: Dict[str, FeastResource], on_miss_exc: Exception
     ) -> FeastResource:
+        # returns a `FeastResource` from the registry, or `on_miss_exc` if the object doesn't exist in the registry
         self._maybe_init_project_metadata(project)
 
-        # returns a `FeastResource` from the registry, or `on_miss_exc` if the object doesn't exist in the registry
         if not self.is_built:
             raise RegistryNotBuiltException(registry_name=self.__class__.__name__)
         key = project_key(project, name)
@@ -720,17 +721,16 @@ class MemoryRegistry(BaseRegistry):
         return self.infra[project]
 
     def apply_user_metadata(self, project: str, feature_view: BaseFeatureView, metadata_bytes: Optional[bytes]) -> None:
-        # not supported for in-memory objects
+        # not supported for BaseFeatureView in-memory objects
         pass
 
     def get_user_metadata(self, project: str, feature_view: BaseFeatureView) -> Optional[bytes]:
-        # not supported for in-memory objects
+        # not supported for BaseFeatureView in-memory objects
         pass
 
     def proto(self) -> RegistryProto:
         r = RegistryProto()
-        last_updated_timestamps = []
-        for project in :
+        for project in self.project_metadata:
             for lister, registry_proto_field in [
                 (self.list_entities, r.entities),
                 (self.list_feature_views, r.feature_views),
@@ -743,10 +743,7 @@ class MemoryRegistry(BaseRegistry):
                 (self.list_validation_references, r.validation_references),
                 (self.list_project_metadata, r.project_metadata),
             ]:
-                lister_has_udf = lister in {self.list_on_demand_feature_views, self.list_stream_feature_views}
-                ignore_udfs = self._in_feast_apply_context
-                objs: List[Any] = lister(project, ignore_udfs=ignore_udfs) if lister_has_udf else lister(
-                    project)  # type: ignore
+                objs: List[Any] = lister(project)
                 if objs:
                     registry_proto_field_data = []
                     for obj in objs:
@@ -758,12 +755,6 @@ class MemoryRegistry(BaseRegistry):
 
                     registry_proto_field.extend(registry_proto_field_data)
             r.infra.CopyFrom(self.get_infra(project).to_proto())
-            last_updated_metadata = self._get_last_updated_metadata(project)
-            if last_updated_metadata is not None:
-                last_updated_timestamps.append(self._get_last_updated_metadata(project))
-
-        if last_updated_timestamps:
-            r.last_updated.FromDatetime(max(last_updated_timestamps))
         return r
 
     def commit(self) -> None:
