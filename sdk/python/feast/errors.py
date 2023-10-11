@@ -441,3 +441,8 @@ class FeatureServiceNameCollisionException(Exception):
 class MissingInfraObjectException(Exception):
     def __init__(self, project: str) -> None:
         super(MissingInfraObjectException, self).__init__(f"No infra objects found for project {project}.")
+
+
+class SavedDatasetCollisionException(Exception):
+    def __init__(self, project: str, name: str) -> None:
+        super(SavedDatasetCollisionException, self).__init__(f"Duplicated saved dataset {name} for project {project}")

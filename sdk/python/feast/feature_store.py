@@ -175,11 +175,11 @@ class FeatureStore:
         if registry_config.registry_type == "sql":
             self._registry = SqlRegistry(registry_config, None, is_feast_apply=is_feast_apply)
         elif registry_config.registry_type == "memory":
-            from feast.repo_operations import apply_total
             self._registry = MemoryRegistry(registry_config, repo_path, is_feast_apply=is_feast_apply)
 
             # RB: MemoryRegistry is stateless, meaning we'll need to call `apply` with each new FeatureStore instance
             if not is_feast_apply:
+                from feast.repo_operations import apply_total
                 apply_total(repo_config=self.config, repo_path=self.repo_path, skip_source_validation=False, store=self)
         else:
             r = Registry(registry_config, repo_path=self.repo_path)

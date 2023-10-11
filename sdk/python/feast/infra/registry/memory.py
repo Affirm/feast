@@ -36,7 +36,8 @@ from feast.errors import (
     DataSourceObjectNotFoundException,
     SavedDatasetNotFound,
     DuplicateValidationReference,
-    MissingInfraObjectException
+    MissingInfraObjectException,
+    SavedDatasetCollisionException
 )
 
 TimeDependentObject = Union[
@@ -68,7 +69,7 @@ def invert_projected_key(projected_key: str) -> Tuple[str, str]:
     return s[0], s[1]
 
 
-def list_registry_dict(project: str, registry: Dict[str, Any]) -> List[Any]:
+def list_registry_dict(project: str, registry: Dict[str, FeastResource]) -> List[FeastResource]:
     # returns a shallow copy of all values in registry that belong to `project`
     return [
         copy.copy(v) for k, v in registry.items() if invert_projected_key(k)[0] == project
@@ -92,7 +93,6 @@ class MemoryRegistry(BaseRegistry):
         self.is_feast_apply = is_feast_apply
 
         self.infra: Dict[str, Infra] = {}
-
         self.entities: Dict[str, Entity] = {}
         self.feature_services: Dict[str, FeatureService] = {}
         self.project_metadata: Dict[str, ProjectMetadata] = {}
@@ -113,6 +113,18 @@ class MemoryRegistry(BaseRegistry):
             self.request_feature_views
         ]
 
+        # recomputing `RegistryProto` is expensive, cache unless changed
+        self.cached_proto: Optional[RegistryProto] = None
+
+    def enter_apply_context(self):
+        self.is_feast_apply = True
+
+    def exit_apply_context(self):
+        self.is_feast_apply = False
+        # if this flag is not set, `get_*` operations of the registry will fail; this flag is subtly different from
+        # `is_feast_apply` in that `is_built` remains True if set at least once.
+        self.is_built = True
+
     def _get_feature_view_registry(self, feature_view: BaseFeatureView) -> Dict[str, BaseFeatureView]:
         # returns the sub-registry that aligns with `type(feature_view)`, or an exception if the type is unknown
         if isinstance(feature_view, StreamFeatureView):
@@ -127,51 +139,48 @@ class MemoryRegistry(BaseRegistry):
 
     def _maybe_init_project_metadata(self, project: str) -> None:
         # updates `usage` project uuid to match requested project
-        if project not in self.project_metadata:
-            self.project_metadata[project] = ProjectMetadata(project_name=project)
-        usage.set_current_project_uuid(self.project_metadata[project].project_uuid)
+        metadata = self.project_metadata.setdefault(project, ProjectMetadata(project_name=project))
+        usage.set_current_project_uuid(metadata.project_uuid)
+
+    def _maybe_reset_proto_registry(self) -> None:
+        # set cached proto registry to `None` if write operation is applied and registry is built
+        if self.is_built:
+            self.cached_proto = None
 
     def _delete_object(
         self, name: str, project: str, registry: Dict[str, FeastResource], on_miss_exc: Exception
     ) -> None:
         # deletes a key from `registry`, or `on_miss_exc` is raised if the object doesn't exist in the registry
         self._maybe_init_project_metadata(project)
-
         key = project_key(project, name)
         if key not in registry:
             raise on_miss_exc
         del registry[key]
+        self._maybe_reset_proto_registry()
 
     def _get_object(
         self, name: str, project: str, registry: Dict[str, FeastResource], on_miss_exc: Exception
     ) -> FeastResource:
         # returns a `FeastResource` from the registry, or `on_miss_exc` if the object doesn't exist in the registry
         self._maybe_init_project_metadata(project)
-
         if not self.is_built:
             raise RegistryNotBuiltException(registry_name=self.__class__.__name__)
         key = project_key(project, name)
         if key not in registry:
             raise on_miss_exc
+        # always return copies to reduce the likelihood of side effects, BUT notice that this is NOT a deep copy
         return copy.copy(registry[key])
 
     def _update_object_ts(self, obj: TimeDependentObject) -> TimeDependentObject:
         # updates the `created_timestamp` and `last_updated_timestamp` attributes of a `TimeDependentObject`
+        # WARNING: this is an in-place operation!
         now = datetime.utcnow()
         if not obj.created_timestamp:
             obj.created_timestamp = now
         obj.last_updated_timestamp = now
         return obj
 
-    def enter_apply_context(self):
-        self.is_feast_apply = True
-
-    def exit_apply_context(self):
-        self.is_feast_apply = False
-        # if this flag is not set, `get_*` operations of the registry will fail
-        self.is_built = True
-
-    def apply_entity(self, entity: Entity, project: str, commit: bool = True):
+    def apply_entity(self, entity: Entity, project: str, commit: bool = True) -> None:
         """
         Registers a single entity with Feast
 
@@ -186,9 +195,12 @@ class MemoryRegistry(BaseRegistry):
         key = project_key(project, entity.name)
         if key in self.entities:
             raise EntityNameCollisionException(entity.name, project)
-        self.entities[key] = copy.copy(self._update_object_ts(obj=entity))
 
-    def delete_entity(self, name: str, project: str, commit: bool = True):
+        entity_copy = copy.copy(entity)
+        self.entities[key] = self._update_object_ts(entity_copy)
+        self._maybe_reset_proto_registry()
+
+    def delete_entity(self, name: str, project: str, commit: bool = True) -> None:
         """
         Deletes an entity or raises an exception if not found.
 
@@ -214,9 +226,8 @@ class MemoryRegistry(BaseRegistry):
             Returns either the specified entity, or raises an exception if
             none is found
         """
-        return self._get_object(
-            name=name, project=project, registry=self.entities, on_miss_exc=EntityNotFoundException(name, project)
-        )
+        exc = EntityNotFoundException(name, project)
+        return self._get_object(name=name, project=project, registry=self.entities, on_miss_exc=exc)
 
     def list_entities(self, project: str, allow_cache: bool = False) -> List[Entity]:
         """
@@ -229,12 +240,9 @@ class MemoryRegistry(BaseRegistry):
         Returns:
             List of entities
         """
-        return list_registry_dict(project, self.entities)
+        return list_registry_dict(project=project, registry=self.entities)
 
-    # Data source operations
-    def apply_data_source(
-        self, data_source: DataSource, project: str, commit: bool = True
-    ):
+    def apply_data_source(self, data_source: DataSource, project: str, commit: bool = True) -> None:
         """
         Registers a single data source with Feast
 
@@ -244,13 +252,13 @@ class MemoryRegistry(BaseRegistry):
             commit: Whether to immediately commit to the registry
         """
         self._maybe_init_project_metadata(project)
-
         key = project_key(project, data_source.name)
         if key in self.data_sources:
             raise DataSourceRepeatNamesException(data_source.name)
         self.data_sources[key] = copy.copy(data_source)
+        self._maybe_reset_proto_registry()
 
-    def delete_data_source(self, name: str, project: str, commit: bool = True):
+    def delete_data_source(self, name: str, project: str, commit: bool = True) -> None:
         """
         Deletes a data source or raises an exception if not found.
 
@@ -262,9 +270,7 @@ class MemoryRegistry(BaseRegistry):
         exc = DataSourceObjectNotFoundException(name=name, project=project)
         self._delete_object(name=name, project=project, registry=self.data_sources, on_miss_exc=exc)
 
-    def get_data_source(
-        self, name: str, project: str, allow_cache: bool = False
-    ) -> DataSource:
+    def get_data_source(self, name: str, project: str, allow_cache: bool = False) -> DataSource:
         """
         Retrieves a data source.
 
@@ -279,9 +285,7 @@ class MemoryRegistry(BaseRegistry):
         exc = DataSourceObjectNotFoundException(name=name, project=project)
         return self._get_object(name=name, project=project, registry=self.data_sources, on_miss_exc=exc)
 
-    def list_data_sources(
-        self, project: str, allow_cache: bool = False
-    ) -> List[DataSource]:
+    def list_data_sources(self, project: str, allow_cache: bool = False) -> List[DataSource]:
         """
         Retrieve a list of data sources from the registry
 
@@ -292,12 +296,9 @@ class MemoryRegistry(BaseRegistry):
         Returns:
             List of data sources
         """
-        return list_registry_dict(project, self.data_sources)
+        return list_registry_dict(project=project, registry=self.data_sources)
 
-    # Feature service operations
-    def apply_feature_service(
-        self, feature_service: FeatureService, project: str, commit: bool = True
-    ):
+    def apply_feature_service(self, feature_service: FeatureService, project: str, commit: bool = True) -> None:
         """
         Registers a single feature service with Feast
 
@@ -306,13 +307,14 @@ class MemoryRegistry(BaseRegistry):
             project: Feast project that this entity belongs to
         """
         self._maybe_init_project_metadata(project)
-
         key = project_key(project, feature_service.name)
         if key in self.feature_services:
             raise FeatureServiceNameCollisionException(service_name=feature_service.name, project=project)
-        self.feature_services[key] = copy.copy(self._update_object_ts(feature_service))
+        service_copy = copy.copy(feature_service)
+        self.feature_services[key] = self._update_object_ts(service_copy)
+        self._maybe_reset_proto_registry()
 
-    def delete_feature_service(self, name: str, project: str, commit: bool = True):
+    def delete_feature_service(self, name: str, project: str, commit: bool = True) -> None:
         """
         Deletes a feature service or raises an exception if not found.
 
@@ -324,9 +326,7 @@ class MemoryRegistry(BaseRegistry):
         exc = FeatureServiceNotFoundException(name=name, project=project)
         self._delete_object(name=name, project=project, registry=self.feature_services, on_miss_exc=exc)
 
-    def get_feature_service(
-            self, name: str, project: str, allow_cache: bool = False
-    ) -> FeatureService:
+    def get_feature_service(self, name: str, project: str, allow_cache: bool = False) -> FeatureService:
         """
         Retrieves a feature service.
 
@@ -342,9 +342,7 @@ class MemoryRegistry(BaseRegistry):
         exc = FeatureServiceNotFoundException(name=name, project=project)
         return self._get_object(name=name, project=project, registry=self.feature_services, on_miss_exc=exc)
 
-    def list_feature_services(
-        self, project: str, allow_cache: bool = False
-    ) -> List[FeatureService]:
+    def list_feature_services(self, project: str, allow_cache: bool = False) -> List[FeatureService]:
         """
         Retrieve a list of feature services from the registry
 
@@ -357,9 +355,7 @@ class MemoryRegistry(BaseRegistry):
         """
         return list_registry_dict(project, self.feature_services)
 
-    def apply_feature_view(
-        self, feature_view: BaseFeatureView, project: str, commit: bool = True
-    ):
+    def apply_feature_view(self, feature_view: BaseFeatureView, project: str, commit: bool = True) -> None:
         """
         Registers a single feature view with Feast
 
@@ -375,9 +371,11 @@ class MemoryRegistry(BaseRegistry):
         key = project_key(project, feature_view.name)
         if key in registry:
             raise ConflictingFeatureViewNames(feature_view.name)
-        registry[key] = copy.copy(self._update_object_ts(feature_view))
+        feature_view_copy = copy.copy(feature_view)
+        registry[key] = self._update_object_ts(feature_view_copy)
+        self._maybe_reset_proto_registry()
 
-    def delete_feature_view(self, name: str, project: str, commit: bool = True):
+    def delete_feature_view(self, name: str, project: str, commit: bool = True) -> None:
         """
         Deletes a feature view or raises an exception if not found.
 
@@ -386,14 +384,16 @@ class MemoryRegistry(BaseRegistry):
             project: Feast project that this feature view belongs to
             commit: Whether the change should be persisted immediately
         """
+        self._maybe_init_project_metadata(project=project)
         key = project_key(project, name)
         for registry in self.feature_view_registries:
             if key in registry:
                 del registry[key]
+                self._maybe_reset_proto_registry()
                 return
         raise FeatureViewNotFoundException(name=name, project=project)
 
-    def get_stream_feature_view(self, name: str, project: str, allow_cache: bool = False):
+    def get_stream_feature_view(self, name: str, project: str, allow_cache: bool = False) -> StreamFeatureView:
         """
         Retrieves a stream feature view.
 
@@ -425,9 +425,7 @@ class MemoryRegistry(BaseRegistry):
         """
         return list_registry_dict(project, self.stream_feature_views)
 
-    def get_on_demand_feature_view(
-        self, name: str, project: str, allow_cache: bool = False
-    ) -> OnDemandFeatureView:
+    def get_on_demand_feature_view(self, name: str, project: str, allow_cache: bool = False) -> OnDemandFeatureView:
         """
         Retrieves an on demand feature view.
 
@@ -459,9 +457,7 @@ class MemoryRegistry(BaseRegistry):
         """
         return list_registry_dict(project, self.on_demand_feature_views)
 
-    def get_feature_view(
-        self, name: str, project: str, allow_cache: bool = False
-    ) -> FeatureView:
+    def get_feature_view(self, name: str, project: str, allow_cache: bool = False) -> FeatureView:
         """
         Retrieves a feature view.
 
@@ -477,9 +473,7 @@ class MemoryRegistry(BaseRegistry):
         exc = FeatureViewNotFoundException(name=name, project=project)
         return self._get_object(name=name, project=project, registry=self.feature_views, on_miss_exc=exc)
 
-    def list_feature_views(
-        self, project: str, allow_cache: bool = False
-    ) -> List[FeatureView]:
+    def list_feature_views(self, project: str, allow_cache: bool = False) -> List[FeatureView]:
         """
         Retrieve a list of feature views from the registry
 
@@ -508,9 +502,7 @@ class MemoryRegistry(BaseRegistry):
         exc = FeatureViewNotFoundException(name=name, project=project)
         return self._get_object(name=name, project=project, registry=self.request_feature_views, on_miss_exc=exc)
 
-    def list_request_feature_views(
-        self, project: str, allow_cache: bool = False
-    ) -> List[RequestFeatureView]:
+    def list_request_feature_views(self, project: str, allow_cache: bool = False) -> List[RequestFeatureView]:
         """
         Retrieve a list of request feature views from the registry
 
@@ -530,15 +522,15 @@ class MemoryRegistry(BaseRegistry):
         start_date: datetime,
         end_date: datetime,
         commit: bool = True,
-    ):
+    ) -> None:
         self._maybe_init_project_metadata(project)
-
         key = project_key(project, feature_view.name)
         for registry in [self.feature_views, self.stream_feature_views]:
             if key in registry:
                 fv = registry[key]
                 fv.materialization_intervals.append((start_date, end_date))
                 fv.last_updated_timestamp = datetime.utcnow()
+                self._maybe_reset_proto_registry()
                 return
         raise FeatureViewNotFoundException(feature_view.name, project)
 
@@ -547,7 +539,7 @@ class MemoryRegistry(BaseRegistry):
         saved_dataset: SavedDataset,
         project: str,
         commit: bool = True,
-    ):
+    ) -> None:
         """
         Stores a saved dataset metadata with Feast
 
@@ -557,11 +549,12 @@ class MemoryRegistry(BaseRegistry):
             commit: Whether the change should be persisted immediately
         """
         self._maybe_init_project_metadata(project)
-
         key = project_key(project, saved_dataset.name)
         if key in self.saved_datasets:
-            raise ValueError(f"Duplicate saved dataset {saved_dataset.name} for project {project}.")
-        self.saved_datasets[key] = copy.copy(self._update_object_ts(saved_dataset))
+            raise SavedDatasetCollisionException(project=project, name=saved_dataset.name)
+        saved_dataset_copy = copy.copy(saved_dataset)
+        self.saved_datasets[key] = self._update_object_ts(saved_dataset_copy)
+        self._maybe_reset_proto_registry()
 
     def get_saved_dataset(
         self, name: str, project: str, allow_cache: bool = False
@@ -597,9 +590,7 @@ class MemoryRegistry(BaseRegistry):
         exc = SavedDatasetNotFound(name=name, project=project)
         self._delete_object(name=name, project=project, registry=self.saved_datasets, on_miss_exc=exc)
 
-    def list_saved_datasets(
-        self, project: str, allow_cache: bool = False
-    ) -> List[SavedDataset]:
+    def list_saved_datasets(self, project: str, allow_cache: bool = False) -> List[SavedDataset]:
         """
         Retrieves a list of all saved datasets in specified project
 
@@ -617,7 +608,7 @@ class MemoryRegistry(BaseRegistry):
         validation_reference: ValidationReference,
         project: str,
         commit: bool = True,
-    ):
+    ) -> None:
         """
         Persist a validation reference
 
@@ -627,14 +618,13 @@ class MemoryRegistry(BaseRegistry):
             commit: Whether the change should be persisted immediately
         """
         self._maybe_init_project_metadata(project)
-
         key = project_key(project, validation_reference.name)
         if key in self.validation_references:
             raise DuplicateValidationReference(name=validation_reference.name, project=project)
         self.validation_references[key] = copy.copy(validation_reference)
+        self._maybe_reset_proto_registry()
 
-
-    def delete_validation_reference(self, name: str, project: str, commit: bool = True):
+    def delete_validation_reference(self, name: str, project: str, commit: bool = True) -> None:
         """
         Deletes a validation reference or raises an exception if not found.
 
@@ -664,9 +654,7 @@ class MemoryRegistry(BaseRegistry):
         exc = ValidationReferenceNotFound(name=name, project=project)
         return self._get_object(name=name, project=project, registry=self.validation_references, on_miss_exc=exc)
 
-    def list_validation_references(
-        self, project: str, allow_cache: bool = False
-    ) -> List[ValidationReference]:
+    def list_validation_references(self, project: str, allow_cache: bool = False) -> List[ValidationReference]:
         """
         Retrieve a list of validation references from the registry
 
@@ -679,9 +667,7 @@ class MemoryRegistry(BaseRegistry):
         """
         return list_registry_dict(project=project, registry=self.validation_references)
 
-    def list_project_metadata(
-        self, project: str, allow_cache: bool = False
-    ) -> List[ProjectMetadata]:
+    def list_project_metadata(self, project: str, allow_cache: bool = False) -> List[ProjectMetadata]:
         """
         Retrieves project metadata
 
@@ -704,6 +690,7 @@ class MemoryRegistry(BaseRegistry):
             commit: Whether the change should be persisted immediately
         """
         self.infra[project] = copy.copy(infra)
+        self._maybe_reset_proto_registry()
 
     def get_infra(self, project: str, allow_cache: bool = False) -> Infra:
         """
@@ -729,7 +716,10 @@ class MemoryRegistry(BaseRegistry):
         pass
 
     def proto(self) -> RegistryProto:
-        r = RegistryProto()
+        if self.cached_proto:
+            return self.cached_proto
+
+        r = self.cached_proto = RegistryProto()
         for project in self.project_metadata:
             for lister, registry_proto_field in [
                 (self.list_entities, r.entities),
