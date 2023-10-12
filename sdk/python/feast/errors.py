@@ -446,3 +446,8 @@ class MissingInfraObjectException(Exception):
 class SavedDatasetCollisionException(Exception):
     def __init__(self, project: str, name: str) -> None:
         super(SavedDatasetCollisionException, self).__init__(f"Duplicated saved dataset {name} for project {project}")
+
+
+class MissingProjectMetadataException(Exception):
+    def __init__(self, project: str) -> None:
+        super(MissingProjectMetadataException, self).__init__(f"No project metadata for project {project}")

@@ -295,7 +295,6 @@ class StreamFeatureView(FeatureView):
         fv = StreamFeatureView(
             name=self.name,
             schema=self.schema,
-            entities=self.entities,
             ttl=self.ttl,
             tags=self.tags,
             online=self.online,
@@ -304,9 +303,10 @@ class StreamFeatureView(FeatureView):
             aggregations=self.aggregations,
             mode=self.mode,
             timestamp_field=self.timestamp_field,
-            source=self.source,
+            source=self.stream_source,
             udf=self.udf,
         )
+        fv.entities = self.entities
         fv.projection = copy.copy(self.projection)
         return fv
 

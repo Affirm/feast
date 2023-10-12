@@ -115,6 +115,7 @@ def parse_repo(repo_root: Path) -> RepoContents:
         request_feature_views=[],
     )
 
+    res.entities.append(DUMMY_ENTITY)
     for repo_file in get_repo_files(repo_root):
         module_path = py_path_to_module(repo_file)
         module = importlib.import_module(module_path)
@@ -198,8 +199,6 @@ def parse_repo(repo_root: Path) -> RepoContents:
                 (obj is rfv) for rfv in res.request_feature_views
             ):
                 res.request_feature_views.append(obj)
-
-    res.entities.append(DUMMY_ENTITY)
     return res
 
 

@@ -37,8 +37,10 @@ from feast.errors import (
     SavedDatasetNotFound,
     DuplicateValidationReference,
     MissingInfraObjectException,
-    SavedDatasetCollisionException
+    SavedDatasetCollisionException,
+    MissingProjectMetadataException
 )
+
 
 TimeDependentObject = Union[
     BaseFeatureView,
@@ -193,7 +195,7 @@ class MemoryRegistry(BaseRegistry):
 
         entity.is_valid()
         key = project_key(project, entity.name)
-        if key in self.entities:
+        if key in self.entities and self.entities[key] != entity:
             raise EntityNameCollisionException(entity.name, project)
 
         entity_copy = copy.copy(entity)
@@ -253,7 +255,7 @@ class MemoryRegistry(BaseRegistry):
         """
         self._maybe_init_project_metadata(project)
         key = project_key(project, data_source.name)
-        if key in self.data_sources:
+        if key in self.data_sources and self.data_sources[key] != data_source:
             raise DataSourceRepeatNamesException(data_source.name)
         self.data_sources[key] = copy.copy(data_source)
         self._maybe_reset_proto_registry()
@@ -308,7 +310,7 @@ class MemoryRegistry(BaseRegistry):
         """
         self._maybe_init_project_metadata(project)
         key = project_key(project, feature_service.name)
-        if key in self.feature_services:
+        if key in self.feature_services and self.feature_services[key] != feature_service:
             raise FeatureServiceNameCollisionException(service_name=feature_service.name, project=project)
         service_copy = copy.copy(feature_service)
         self.feature_services[key] = self._update_object_ts(service_copy)
@@ -369,7 +371,7 @@ class MemoryRegistry(BaseRegistry):
 
         registry = self._get_feature_view_registry(feature_view)
         key = project_key(project, feature_view.name)
-        if key in registry:
+        if key in registry and registry[key] != feature_view:
             raise ConflictingFeatureViewNames(feature_view.name)
         feature_view_copy = copy.copy(feature_view)
         registry[key] = self._update_object_ts(feature_view_copy)
@@ -550,7 +552,7 @@ class MemoryRegistry(BaseRegistry):
         """
         self._maybe_init_project_metadata(project)
         key = project_key(project, saved_dataset.name)
-        if key in self.saved_datasets:
+        if key in self.saved_datasets and self.saved_datasets[key] != saved_dataset:
             raise SavedDatasetCollisionException(project=project, name=saved_dataset.name)
         saved_dataset_copy = copy.copy(saved_dataset)
         self.saved_datasets[key] = self._update_object_ts(saved_dataset_copy)
@@ -619,7 +621,7 @@ class MemoryRegistry(BaseRegistry):
         """
         self._maybe_init_project_metadata(project)
         key = project_key(project, validation_reference.name)
-        if key in self.validation_references:
+        if key in self.validation_references and self.validation_references[key] != validation_reference:
             raise DuplicateValidationReference(name=validation_reference.name, project=project)
         self.validation_references[key] = copy.copy(validation_reference)
         self._maybe_reset_proto_registry()
@@ -678,7 +680,9 @@ class MemoryRegistry(BaseRegistry):
         Returns:
             List of project metadata
         """
-        return list_registry_dict(project=project, registry=self.project_metadata)
+        if project not in self.project_metadata:
+            raise MissingProjectMetadataException(project=project)
+        return [self.project_metadata[project]]
 
     def update_infra(self, infra: Infra, project: str, commit: bool = True):
         """
