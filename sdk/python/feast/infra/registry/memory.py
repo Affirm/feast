@@ -1,5 +1,4 @@
 import copy
-import uuid
 from typing import Optional, Dict, List, Any, Tuple, Union
 from pathlib import Path
 from datetime import datetime
@@ -36,11 +35,9 @@ from feast.errors import (
     DataSourceObjectNotFoundException,
     SavedDatasetNotFound,
     DuplicateValidationReference,
-    MissingInfraObjectException,
     SavedDatasetCollisionException,
     MissingProjectMetadataException
 )
-
 
 TimeDependentObject = Union[
     BaseFeatureView,
@@ -81,13 +78,12 @@ def list_registry_dict(project: str, registry: Dict[str, FeastResource]) -> List
 class MemoryRegistry(BaseRegistry):
     def __init__(
         self,
-        repo_config: Optional[RegistryConfig],
+        registry_config: Optional[RegistryConfig],
         repo_path: Optional[Path],
         is_feast_apply: bool = False
     ) -> None:
 
         # unused
-        self.repo_config = repo_config
         self.repo_path = repo_path
 
         # flag signaling that the registry has been populated; this should be set after a Feast apply operation
@@ -123,6 +119,7 @@ class MemoryRegistry(BaseRegistry):
 
     def exit_apply_context(self):
         self.is_feast_apply = False
+        self.proto()
         # if this flag is not set, `get_*` operations of the registry will fail; this flag is subtly different from
         # `is_feast_apply` in that `is_built` remains True if set at least once.
         self.is_built = True
@@ -708,7 +705,7 @@ class MemoryRegistry(BaseRegistry):
             The stored Infra object.
         """
         if project not in self.infra:
-            raise MissingInfraObjectException(project)
+            return Infra()
         return self.infra[project]
 
     def apply_user_metadata(self, project: str, feature_view: BaseFeatureView, metadata_bytes: Optional[bytes]) -> None:
@@ -723,7 +720,7 @@ class MemoryRegistry(BaseRegistry):
         if self.cached_proto:
             return self.cached_proto
 
-        r = self.cached_proto = RegistryProto()
+        r = RegistryProto()
         for project in self.project_metadata:
             for lister, registry_proto_field in [
                 (self.list_entities, r.entities),
@@ -749,6 +746,8 @@ class MemoryRegistry(BaseRegistry):
 
                     registry_proto_field.extend(registry_proto_field_data)
             r.infra.CopyFrom(self.get_infra(project).to_proto())
+        if self.is_built:
+            self.cached_proto = r
         return r
 
     def commit(self) -> None:
@@ -756,5 +755,9 @@ class MemoryRegistry(BaseRegistry):
         pass
 
     def refresh(self, project: Optional[str] = None) -> None:
-        # This is a noop because MemoryRegistry is a cache
+        self.proto()
+        if project:
+            self._maybe_init_project_metadata(project)
+
+    def teardown(self) -> None:
         pass
