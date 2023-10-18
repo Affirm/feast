@@ -151,9 +151,10 @@ class OnDemandFeatureView(BaseFeatureView):
     def __copy__(self):
         fv = OnDemandFeatureView(
             name=self.name,
-            schema=self.features,
-            sources=list(self.source_feature_view_projections.values())
-            + list(self.source_request_sources.values()),
+            schema=[copy.copy(feature) for feature in self.features],
+            sources=copy.copy(
+                list(self.source_feature_view_projections.values()) + list(self.source_request_sources.values())
+            ),
             udf=self.udf,
             udf_string=self.udf_string,
             mode=self.mode,
@@ -162,6 +163,8 @@ class OnDemandFeatureView(BaseFeatureView):
             owner=self.owner,
         )
         fv.projection = copy.copy(self.projection)
+        fv.created_timestamp = self.created_timestamp
+        fv.last_updated_timestamp = self.last_updated_timestamp
         return fv
 
     def __eq__(self, other):

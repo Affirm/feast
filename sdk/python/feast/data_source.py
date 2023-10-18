@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import enum
+import copy
 import warnings
 from abc import ABC, abstractmethod
 from datetime import timedelta
@@ -96,6 +97,14 @@ class KafkaOptions:
 
         return kafka_options_proto
 
+    def __copy__(self):
+        return KafkaOptions(
+            kafka_bootstrap_servers=self.kafka_bootstrap_servers,
+            message_format=self.message_format,
+            topic=self.topic,
+            watermark_delay_threshold=self.watermark_delay_threshold
+        )
+
 
 class KinesisOptions:
     """
@@ -111,6 +120,13 @@ class KinesisOptions:
         self.record_format = record_format
         self.region = region
         self.stream_name = stream_name
+
+    def __copy__(self):
+        return KinesisOptions(
+            record_format=copy.copy(self.record_format),
+            region=self.region,
+            stream_name=self.stream_name
+        )
 
     @classmethod
     def from_proto(cls, kinesis_options_proto: DataSourceProto.KinesisOptions):
@@ -438,6 +454,22 @@ class KafkaSource(DataSource):
     def __hash__(self):
         return super().__hash__()
 
+    def __copy__(self):
+        return KafkaSource(
+            name=self.name,
+            field_mapping=dict(self.field_mapping),
+            kafka_bootstrap_servers=self.kafka_options.kafka_bootstrap_servers,
+            message_format=self.kafka_options.message_format,
+            watermark_delay_threshold=self.kafka_options.watermark_delay_threshold,
+            topic=self.kafka_options.topic,
+            created_timestamp_column=self.created_timestamp_column,
+            timestamp_field=self.timestamp_field,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner,
+            batch_source=copy.copy(self.batch_source) if self.batch_source else None,
+        )
+
     @staticmethod
     def from_proto(data_source: DataSourceProto):
         watermark_delay_threshold = None
@@ -561,6 +593,15 @@ class RequestSource(DataSource):
     def __hash__(self):
         return super().__hash__()
 
+    def __copy__(self):
+        return RequestSource(
+            name=self.name,
+            schema=[copy.copy(field) for field in self.schema],
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner
+        )
+
     @staticmethod
     def from_proto(data_source: DataSourceProto):
         schema_pb = data_source.request_data_options.schema
@@ -635,6 +676,21 @@ class KinesisSource(DataSource):
             batch_source=DataSource.from_proto(data_source.batch_source)
             if data_source.batch_source
             else None,
+        )
+
+    def __copy__(self):
+        return KinesisSource(
+            name=self.name,
+            timestamp_field=self.timestamp_field,
+            field_mapping=dict(self.field_mapping),
+            record_format=copy.copy(self.kinesis_options.record_format),
+            region=self.kinesis_options.region,
+            stream_name=self.kinesis_options.stream_name,
+            created_timestamp_column=self.created_timestamp_column,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner,
+            batch_source=copy.copy(self.batch_source) if self.batch_source else None
         )
 
     @staticmethod
@@ -770,6 +826,15 @@ class PushSource(DataSource):
 
     def __hash__(self):
         return super().__hash__()
+
+    def __copy__(self):
+        return PushSource(
+            name=self.name,
+            batch_source=copy.copy(self.batch_source),
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner
+        )
 
     def validate(self, config: RepoConfig):
         pass

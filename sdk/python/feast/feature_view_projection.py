@@ -1,3 +1,4 @@
+import copy
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from attr import dataclass
@@ -38,6 +39,15 @@ class FeatureViewProjection:
     def name_to_use(self):
         return self.name_alias or self.name
 
+    def __copy__(self):
+        return FeatureViewProjection(
+            name=self.name,
+            name_alias=self.name_alias,
+            desired_features=self.desired_features,
+            features=copy.copy(self.features),
+            join_key_map=dict(self.join_key_map)
+        )
+
     def to_proto(self) -> FeatureViewProjectionProto:
         feature_reference_proto = FeatureViewProjectionProto(
             feature_view_name=self.name,
@@ -67,7 +77,7 @@ class FeatureViewProjection:
     def from_definition(base_feature_view: "BaseFeatureView"):
         return FeatureViewProjection(
             name=base_feature_view.name,
-            name_alias=None,
+            name_alias="",
             features=base_feature_view.features,
             desired_features=[],
         )

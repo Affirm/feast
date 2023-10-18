@@ -67,7 +67,7 @@ class Field:
 
         if (
             self.name != other.name
-            or self.dtype != other.dtype
+            or self.dtype.to_value_type() != other.dtype.to_value_type()
             or self.description != other.description
             or self.tags != other.tags
         ):
@@ -85,6 +85,14 @@ class Field:
 
     def __str__(self):
         return f"Field(name={self.name}, dtype={self.dtype}, tags={self.tags})"
+
+    def __copy__(self):
+        return Field(
+            name=self.name,
+            dtype=self.dtype,
+            description=self.description,
+            tags=dict(self.tags)
+        )
 
     def to_proto(self) -> FieldProto:
         """Converts a Field object to its protobuf representation."""

@@ -1,3 +1,4 @@
+import copy
 from datetime import datetime
 from typing import Dict, List, Optional, Union
 
@@ -184,6 +185,24 @@ class FeatureService:
             return False
 
         return True
+
+    def __copy__(self):
+        fs = FeatureService(
+            name=self.name,
+            features=[],
+            tags=dict(self.tags),
+            description=self.description,
+            owner=self.owner,
+            logging_config=copy.copy(self.logging_config)
+        )
+        fs.feature_view_projections.extend(
+            [
+                copy.copy(projection) for projection in self.feature_view_projections
+            ]
+        )
+        fs.created_timestamp = self.created_timestamp
+        fs.last_updated_timestamp = self.last_updated_timestamp
+        return fs
 
     @classmethod
     def from_proto(cls, feature_service_proto: FeatureServiceProto):
