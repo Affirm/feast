@@ -1015,15 +1015,15 @@ x
         tables_to_delete: List[FeatureView] = views_to_delete + sfvs_to_delete if not partial else []  # type: ignore
         tables_to_keep: List[FeatureView] = views_to_update + sfvs_to_update  # type: ignore
 
-        self._get_provider().update_infra(
-            project=self.project,
-            tables_to_delete=tables_to_delete,
-            tables_to_keep=tables_to_keep,
-            entities_to_delete=entities_to_delete if not partial else [],
-            entities_to_keep=entities_to_update,
-            partial=partial,
-        )
-
+        if not self.config.ignore_infra_changes:
+            self._get_provider().update_infra(
+                project=self.project,
+                tables_to_delete=tables_to_delete,
+                tables_to_keep=tables_to_keep,
+                entities_to_delete=entities_to_delete if not partial else [],
+                entities_to_keep=entities_to_update,
+                partial=partial,
+            )
         self._registry.commit()
 
     @log_exceptions_and_usage
@@ -1036,7 +1036,8 @@ x
 
         entities = self.list_entities()
 
-        self._get_provider().teardown_infra(self.project, tables, entities)
+        if not self.config.ignore_infra_changes:
+            self._get_provider().teardown_infra(self.project, tables, entities)
         self._registry.teardown()
 
     @log_exceptions_and_usage
