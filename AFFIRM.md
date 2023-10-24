@@ -2,7 +2,7 @@
 
 1. Clone the repo
 2. Install poetry 1.4.1
-3. Set poetry env: poetry env use 3.7.13
+3. Set poetry env: poetry env use 3.9.17
 4. Run: poetry install
 5. Run: poetry shell
 6. Create venv: python3 -m venv venv/
@@ -24,6 +24,7 @@ To run unit tests: make `test-python`
 
 To publish to jfrog artifactory follow our docs on Confluence to configure. Otherwise run:
 ```
+# note this requires nvm 16.10.0
 make build-ui
 # READ THIS: uncomment line "build_python_protos": BuildPythonProtosCommand in setup.py
 make compile-protos-python
