@@ -112,6 +112,21 @@ class SparkSource(DataSource):
         """
         return self.spark_options.file_format
 
+    def __copy__(self):
+        return SparkSource(
+            name=self.name,
+            field_mapping=dict(self.field_mapping),
+            table=self.spark_options.table,
+            query=self.spark_options.query,
+            path=self.spark_options.path,
+            file_format=self.spark_options.file_format,
+            timestamp_field=self.timestamp_field,
+            created_timestamp_column=self.created_timestamp_column,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner,
+        )
+
     @staticmethod
     def from_proto(data_source: DataSourceProto) -> Any:
         from feast.infra.offline_stores.contrib.spark_offline_store.time_dependent_spark_source import (

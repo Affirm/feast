@@ -1,4 +1,5 @@
 import abc
+import copy
 from typing import TYPE_CHECKING, Dict, Optional, Type, cast
 
 import pyarrow as pa
@@ -154,6 +155,12 @@ class LoggingConfig:
     def __init__(self, destination: LoggingDestination, sample_rate: float = 1.0):
         self.destination = destination
         self.sample_rate = sample_rate
+
+    def __copy__(self):
+        return LoggingConfig(
+            destination=copy.copy(self.destination),
+            sample_rate=self.sample_rate
+        )
 
     @classmethod
     def from_proto(cls, config_proto: LoggingConfigProto) -> Optional["LoggingConfig"]:

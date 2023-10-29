@@ -139,6 +139,19 @@ class Entity:
         if not self.value_type:
             raise ValueError(f"The entity {self.name} does not have a type.")
 
+    def __copy__(self):
+        entity = Entity(
+            name=self.name,
+            join_keys=[self.join_key],
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner,
+            value_type=self.value_type
+        )
+        entity.created_timestamp = self.created_timestamp
+        entity.last_updated_timestamp = self.last_updated_timestamp
+        return entity
+
     @classmethod
     def from_proto(cls, entity_proto: EntityProto):
         """

@@ -89,6 +89,21 @@ class TimeDependentSparkSource(SparkSource):
             owner=owner,
         )
 
+    def __copy__(self):
+        return TimeDependentSparkSource(
+            name=self.name,
+            path_prefix=self.path_prefix,
+            time_fmt_str=self.time_fmt_str,
+            path_suffix=self.path_suffix,
+            file_format=self.spark_options.file_format,
+            created_timestamp_column=self.created_timestamp_column,
+            timestamp_field=self.timestamp_field,
+            field_mapping=dict(self.field_mapping),
+            tags=dict(self.tags),
+            owner=self.owner,
+            description=self.description,
+        )
+
     @property
     def time_dependent_path(self) -> str:
         return os.path.join(self.path_prefix, self.time_fmt_str, self.path_suffix)
