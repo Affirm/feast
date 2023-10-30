@@ -217,21 +217,28 @@ class FeatureView(BaseFeatureView):
     def __hash__(self):
         return super().__hash__()
 
-    def __copy__(self):
+    def __copy__(self) -> "FeatureView":
         fv = FeatureView(
             name=self.name,
-            ttl=self.ttl,
-            source=self.stream_source if self.stream_source else self.batch_source,
-            schema=self.schema,
-            tags=self.tags,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner,
             online=self.online,
+            ttl=self.tll,
+            source=self.stream_source if self.stream_source else self.batch_source,
         )
 
         # This is deliberately set outside of the FV initialization as we do not have the Entity objects.
-        fv.entities = self.entities
+        fv.entities = list(self.entities)
         fv.features = copy.copy(self.features)
         fv.entity_columns = copy.copy(self.entity_columns)
         fv.projection = copy.copy(self.projection)
+
+        fv.created_timestamp = self.created_timestamp
+        fv.last_updated_timestamp = self.last_updated_timestamp
+
+        for interval in self.materialization_intervals:
+            fv.materialization_intervals.append(interval)
         return fv
 
     def __eq__(self, other):

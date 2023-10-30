@@ -213,6 +213,19 @@ class TrinoSource(DataSource):
 
         return data_source_proto
 
+    def __copy__(self):
+        return TrinoSource(
+            name=self.name,
+            field_mapping=dict(self.field_mapping),
+            table=self.trino_options.table,
+            query=self.trino_options.query,
+            timestamp_field=self.timestamp_field,
+            created_timestamp_column=self.created_timestamp_column,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner,
+        )
+
     def validate(self, config: RepoConfig):
         self.get_table_column_names_and_types(config)
 

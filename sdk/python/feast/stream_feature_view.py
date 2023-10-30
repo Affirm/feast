@@ -191,7 +191,7 @@ class StreamFeatureView(FeatureView):
             name=self.name,
             entities=self.entities,
             entity_columns=[field.to_proto() for field in self.entity_columns],
-            features=[field.to_proto() for field in self.schema],
+            features=[field.to_proto() for field in self.features],
             user_defined_function=udf_proto,
             description=self.description,
             tags=self.tags,
@@ -237,9 +237,6 @@ class StreamFeatureView(FeatureView):
             tags=dict(sfv_proto.spec.tags),
             owner=sfv_proto.spec.owner,
             online=sfv_proto.spec.online,
-            schema=[
-                Field.from_proto(field_proto) for field_proto in sfv_proto.spec.features
-            ],
             ttl=(
                 timedelta(days=0)
                 if sfv_proto.spec.ttl.ToNanoseconds() == 0
@@ -294,20 +291,31 @@ class StreamFeatureView(FeatureView):
     def __copy__(self):
         fv = StreamFeatureView(
             name=self.name,
-            schema=self.schema,
-            entities=self.entities,
-            ttl=self.ttl,
-            tags=self.tags,
-            online=self.online,
             description=self.description,
+            tags=dict(self.tags),
             owner=self.owner,
-            aggregations=self.aggregations,
+            source=copy.copy(self.stream_source),
+            aggregations=[copy.copy(agg) for agg in self.aggregations],
             mode=self.mode,
             timestamp_field=self.timestamp_field,
-            source=self.source,
             udf=self.udf,
+            udf_string=self.udf_string
         )
+
+        if self.batch_source:
+            fv.batch_source = copy.copy(self.batch_source)
+        if self.stream_source:
+            fv.stream_source = copy.copy(self.stream_source)
+
+        for interval in self.materialization_intervals:
+            fv.materialization_intervals.append(interval)
+
+        fv.entity_columns = copy.copy(self.entity_columns)
+        fv.entities = copy.copy(self.entities)
         fv.projection = copy.copy(self.projection)
+
+        # make this consistent with `from_proto`
+        fv.features = copy.copy(self.features)
         return fv
 
 

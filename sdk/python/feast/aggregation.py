@@ -78,6 +78,14 @@ class Aggregation:
         )
         return aggregation
 
+    def __copy__(self):
+        return Aggregation(
+            column=self.column,
+            function=self.function,
+            time_window=self.time_window,
+            slide_interval=self.slide_interval
+        )
+
     def __eq__(self, other):
         if not isinstance(other, Aggregation):
             raise TypeError("Comparisons should only involve Aggregations.")

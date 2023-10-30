@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import copy
 from typing import Dict, Optional
 
 from feast.protos.feast.core.Feature_pb2 import FeatureSpecV2 as FeatureSpecProto
@@ -126,3 +126,11 @@ class Feature:
         )
 
         return feature
+
+    def __copy__(self) -> "Feature":
+        return Feature(
+            name=self.name,
+            dtype=self.dtype,
+            description=self.description,
+            labels=dict(self.tags)
+        )
