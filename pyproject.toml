@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "feast-affirm"
-version = "0.28+affirm177"
+version = "0.28+affirm178"
 description = "Feast - Affirm"
 authors = ["Francisco Arceo", "Ross Briden", "Maks Stachowiak"]
 readme = "README.md"
@@ -45,9 +45,8 @@ moreorless = "0.4.0"
 mypy = "1.4.1"
 mypy-extensions = "1.0.0"
 mypy-protobuf = "3.1.0"
-numpy = "1.21.6"
+numpy = "1.26.0"
 packaging = "23.1"
-pandas = "1.3.5"
 pandavro = "1.5.2"
 partd = "1.4.0"
 pkgutil-resolve-name = "1.3.10"
@@ -94,6 +93,7 @@ volatile = "2.1.0"
 watchfiles = "0.18.1"
 websockets = "10.4"
 zipp = "3.14.0"
+pandas = "^2.1.3"
 
 
 [build-system]

@@ -39,7 +39,7 @@ except ImportError:
     from distutils.core import setup
 
 NAME = "feast"
-VERSION = "0.28+affirm177"
+VERSION = "0.28+affirm178"
 DESCRIPTION = "Python SDK for Feast @ Affirm"
 URL = "https://github.com/feast-dev/feast"
 AUTHOR = "Feast"
@@ -57,8 +57,8 @@ REQUIRED = [
     "Jinja2>=2,<4",
     "jsonschema",
     "mmh3",
-    "numpy<1.22,<3",
-    "pandas<1.4.3,<2",
+    "numpy==1.26,<3",
+    "pandas>=2.1.3",
     "pandavro==1.5.*", # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
     "protobuf<5,>3",
     "proto-plus>=1.20.0,<2",
