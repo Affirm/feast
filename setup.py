@@ -57,7 +57,7 @@ REQUIRED = [
     "Jinja2>=2,<4",
     "jsonschema",
     "mmh3",
-    "numpy>=1.26",
+    "numpy>=1.24",
     "pandas>=2.1",
     "pandavro==1.5.*", # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
     "protobuf<5,>3",
@@ -207,6 +207,8 @@ AFFIRM_REQUIRED = [
     "Jinja2>=2,<4",
     "jsonschema",
     "mmh3",
+    "numpy>=1.24",
+    "pandas>=2.1",
     "pandavro==1.5.*",  # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
     "pyarrow>=4,<9",
     "pydantic>=1,<2",
@@ -223,8 +225,6 @@ AFFIRM_REQUIRED = [
     "google-api-core>=1.23.0,<2.7",
     "googleapis-common-protos==1.56.2",
     "grpcio-reflection",
-    "numpy<1.22,<2",
-    "pandas>=1,<2",
     "protobuf",
     "proto-plus",
     "PyYAML>=5.1.2",
@@ -427,7 +427,7 @@ class BuildCommand(build_py):
     """Custom build command."""
 
     def run(self):
-        #self.run_command("build_python_protos")
+        # self.run_command("build_python_protos")
         if os.getenv("COMPILE_GO", "false").lower() == "true":
             _ensure_go_and_proto_toolchain()
             self.run_command("build_go_protos")
