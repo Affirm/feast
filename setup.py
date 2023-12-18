@@ -57,7 +57,7 @@ REQUIRED = [
     "Jinja2>=2,<4",
     "jsonschema",
     "mmh3",
-    "numpy>=1.24",
+    "numpy>=1.24,<1.25.0",
     "pandas>=2.1",
     "pandavro==1.5.*", # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
     "protobuf<5,>3",
@@ -207,7 +207,7 @@ AFFIRM_REQUIRED = [
     "Jinja2>=2,<4",
     "jsonschema",
     "mmh3",
-    "numpy>=1.24",
+    "numpy>=1.24,<1.25.0",
     "pandas>=2.1",
     "pandavro==1.5.*",  # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
     "pyarrow>=4,<9",
