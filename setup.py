@@ -39,7 +39,7 @@ except ImportError:
     from distutils.core import setup
 
 NAME = "feast"
-VERSION = "0.28+affirm183"
+VERSION = "0.28+affirm184"
 DESCRIPTION = "Python SDK for Feast @ Affirm"
 URL = "https://github.com/feast-dev/feast"
 AUTHOR = "Feast"
@@ -79,7 +79,7 @@ REQUIRED = [
 ]
 
 GCP_REQUIRED = [
-    "google-cloud-bigquery[pandas]>=2,<4",
+    "google-cloud-bigquery[pandas]",
     "google-cloud-bigquery-storage >= 2.0.0,<3",
     "google-cloud-datastore>=2.1.0,<3",
     "google-cloud-storage>=1.34.0,<3",
@@ -96,11 +96,8 @@ AWS_REQUIRED = ["boto3>=1.17.0,<=1.20.23", "docker>=5.0.2", "s3fs>=0.4.0,<=2022.
 BYTEWAX_REQUIRED = ["bytewax==0.13.1", "docker>=5.0.2", "kubernetes<=20.13.0"]
 
 SNOWFLAKE_REQUIRED = [
-    "snowflake-connector-python[pandas]>=2.7.3,<3",
-    # `pyOpenSSL==22.1.0` requires `cryptography<39,>=38.0.0`, which is incompatible
-    # with `snowflake-connector-python[pandas]==2.8.0`, which depends on
-    # `cryptography<37.0.0,>=3.1.0`.
-    "pyOpenSSL<22.1.0",
+    "snowflake-connector-python[pandas]",
+    "pyOpenSSL",
 ]
 
 SPARK_REQUIRED = [
@@ -125,7 +122,7 @@ CASSANDRA_REQUIRED = [
     "cassandra-driver>=3.24.0,<4",
 ]
 
-GE_REQUIRED = ["great_expectations>=0.14.0,<0.15.0"]
+GE_REQUIRED = ["great_expectations"]
 
 GO_REQUIRED = [
     "cffi==1.15.*,<2",
@@ -209,7 +206,7 @@ AFFIRM_REQUIRED = [
     "mmh3",
     "numpy>=1.24,<1.25.0",
     "pandas>=2.1",
-    "pandavro==1.5.*",  # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
+    "pandavro",
     "pyarrow>=4,<9",
     "pydantic>=1,<2",
     "pygments>=2.12.0,<3",
