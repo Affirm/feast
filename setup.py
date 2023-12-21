@@ -227,7 +227,7 @@ AFFIRM_REQUIRED = [
     "PyYAML>=5.3.1",
     "uvicorn[standard]",
     "tensorflow-metadata",
-    "dask>2023.3.2",
+    "dask>=2023.3.2",
 ]
 
 
