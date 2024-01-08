@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Callable, List, Literal, Optional, Sequence, Union, cast
 from typing import Callable, List, Optional, Sequence, Union
 
 # backward compatibility with python 3.7
@@ -166,7 +167,8 @@ class SparkMaterializationEngine(BatchMaterializationEngine):
         job_id = f"{feature_view.name}-{start_date}-{end_date}"
 
         try:
-            offline_job: SparkRetrievalJob = (
+            offline_job = cast(
+                SparkRetrievalJob,
                 self.offline_store.pull_latest_from_table_or_query(
                     config=self.repo_config,
                     data_source=feature_view.batch_source,
@@ -176,7 +178,7 @@ class SparkMaterializationEngine(BatchMaterializationEngine):
                     created_timestamp_column=created_timestamp_column,
                     start_date=start_date,
                     end_date=end_date,
-                )
+                ),
             )
 
             spark_serialized_artifacts = _SparkSerializedArtifacts.serialize(
@@ -223,7 +225,7 @@ class _SparkSerializedArtifacts:
 
     feature_view_type: str
     feature_view_proto: str
-    repo_config_byte: bytes
+    repo_config_byte: str
 
     @classmethod
     def serialize(cls, feature_view, repo_config):
