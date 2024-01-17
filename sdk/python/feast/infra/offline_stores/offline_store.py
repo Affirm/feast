@@ -62,7 +62,9 @@ class RetrievalJob(ABC):
     """A RetrievalJob manages the execution of a query to retrieve data from the offline store."""
 
     def to_df(
-        self, validation_reference: Optional["ValidationReference"] = None
+        self,
+        validation_reference: Optional["ValidationReference"] = None,
+        timeout: Optional[int] = None,
     ) -> pd.DataFrame:
         """
         Synchronously executes the underlying query and returns the result as a pandas dataframe.
@@ -72,8 +74,9 @@ class RetrievalJob(ABC):
 
         Args:
             validation_reference (optional): The validation to apply against the retrieved dataframe.
+            timeout (optional): The query timeout if applicable.
         """
-        features_df = self._to_df_internal()
+        features_df = self._to_df_internal(timeout=timeout)
 
         if self.on_demand_feature_views:
             # TODO(adchia): Fix requirement to specify dependent feature views in feature_refs
@@ -103,7 +106,9 @@ class RetrievalJob(ABC):
         return features_df
 
     def to_arrow(
-        self, validation_reference: Optional["ValidationReference"] = None
+        self,
+        validation_reference: Optional["ValidationReference"] = None,
+        timeout: Optional[int] = None,
     ) -> pyarrow.Table:
         """
         Synchronously executes the underlying query and returns the result as an arrow table.
@@ -113,11 +118,12 @@ class RetrievalJob(ABC):
 
         Args:
             validation_reference (optional): The validation to apply against the retrieved dataframe.
+            timeout (optional): The query timeout if applicable.
         """
         if not self.on_demand_feature_views and not validation_reference:
-            return self._to_arrow_internal()
+            return self._to_arrow_internal(timeout=timeout)
 
-        features_df = self._to_df_internal()
+        features_df = self._to_df_internal(timeout=timeout)
         if self.on_demand_feature_views:
             for odfv in self.on_demand_feature_views:
                 if odfv.mode != 'pandas':
@@ -151,9 +157,11 @@ class RetrievalJob(ABC):
         pass
 
     @abstractmethod
-    def _to_df_internal(self) -> pd.DataFrame:
+    def _to_df_internal(self, timeout: Optional[int] = None) -> pd.DataFrame:
         """
         Synchronously executes the underlying query and returns the result as a pandas dataframe.
+
+        timeout: RetreivalJob implementations may implement a timeout.
 
         Does not handle on demand transformations or dataset validation. For either of those,
         `to_df` should be used.
@@ -161,9 +169,11 @@ class RetrievalJob(ABC):
         pass
 
     @abstractmethod
-    def _to_arrow_internal(self) -> pyarrow.Table:
+    def _to_arrow_internal(self, timeout: Optional[int] = None) -> pyarrow.Table:
         """
         Synchronously executes the underlying query and returns the result as an arrow table.
+
+        timeout: RetreivalJob implementations may implement a timeout.
 
         Does not handle on demand transformations or dataset validation. For either of those,
         `to_arrow` should be used.
@@ -183,7 +193,12 @@ class RetrievalJob(ABC):
         pass
 
     @abstractmethod
-    def persist(self, storage: SavedDatasetStorage, allow_overwrite: bool = False):
+    def persist(
+        self,
+        storage: SavedDatasetStorage,
+        allow_overwrite: bool = False,
+        timeout: Optional[int] = None,
+    ):
         """
         Synchronously executes the underlying query and persists the result in the same offline store
         at the specified destination.

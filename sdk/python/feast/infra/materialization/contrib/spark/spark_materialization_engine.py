@@ -176,7 +176,7 @@ class SparkMaterializationEngine(BatchMaterializationEngine):
                     created_timestamp_column=created_timestamp_column,
                     start_date=start_date,
                     end_date=end_date,
-                )
+                ),
             )
 
             spark_serialized_artifacts = _SparkSerializedArtifacts.serialize(

@@ -375,7 +375,7 @@ class AthenaRetrievalJob(RetrievalJob):
         return temp_table_dml_header
 
     @log_exceptions_and_usage
-    def _to_df_internal(self) -> pd.DataFrame:
+    def _to_df_internal(self, timeout: Optional[int] = None) -> pd.DataFrame:
         with self._query_generator() as query:
             temp_table_name = "_" + str(uuid.uuid4()).replace("-", "")
             temp_external_location = self.get_temp_s3_path()
@@ -392,7 +392,7 @@ class AthenaRetrievalJob(RetrievalJob):
             )
 
     @log_exceptions_and_usage
-    def _to_arrow_internal(self) -> pa.Table:
+    def _to_arrow_internal(self, timeout: Optional[int] = None) -> pa.Table:
         with self._query_generator() as query:
             temp_table_name = "_" + str(uuid.uuid4()).replace("-", "")
             temp_external_location = self.get_temp_s3_path()
@@ -412,7 +412,12 @@ class AthenaRetrievalJob(RetrievalJob):
     def metadata(self) -> Optional[RetrievalMetadata]:
         return self._metadata
 
-    def persist(self, storage: SavedDatasetStorage, allow_overwrite: bool = False):
+    def persist(
+        self,
+        storage: SavedDatasetStorage,
+        allow_overwrite: Optional[bool] = False,
+        timeout: Optional[int] = None,
+    ):
         assert isinstance(storage, SavedDatasetAthenaStorage)
         self.to_athena(table_name=storage.athena_options.table)
 

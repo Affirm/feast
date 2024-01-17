@@ -300,7 +300,7 @@ PYTHON_SCALAR_VALUE_TYPE_TO_PROTO_VALUE: Dict[
     ValueType.DOUBLE: ("double_val", lambda x: x, {float, np.float64}),
     ValueType.STRING: ("string_val", lambda x: str(x), None),
     ValueType.BYTES: ("bytes_val", lambda x: x, {bytes}),
-    ValueType.BOOL: ("bool_val", lambda x: x, {bool, np.bool_}),
+    ValueType.BOOL: ("bool_val", lambda x: x, {bool, np.bool_, int, np.int_}),
 }
 
 
@@ -405,9 +405,14 @@ def _python_value_to_proto_value(
             if (sample == 0 or sample == 0.0) and feast_value_type != ValueType.BOOL:
                 # Numpy convert 0 to int. However, in the feature view definition, the type of column may be a float.
                 # So, if value is 0, type validation must pass if scalar_types are either int or float.
-                assert type(sample) in [np.int64, int, np.float64, float]
+                allowed_types = {np.int64, int, np.float64, float}
+                assert (
+                    type(sample) in allowed_types
+                ), f"Type `{type(sample)}` not in {allowed_types}"
             else:
-                assert type(sample) in valid_scalar_types
+                assert (
+                    type(sample) in valid_scalar_types
+                ), f"Type `{type(sample)}` not in {valid_scalar_types}"
         if feast_value_type == ValueType.BOOL:
             # ProtoValue does not support conversion of np.bool_ so we need to convert it to support np.bool_.
             return [
@@ -523,6 +528,7 @@ def bq_to_feast_value_type(bq_type_as_str: str) -> ValueType:
         "DATETIME": ValueType.UNIX_TIMESTAMP,
         "TIMESTAMP": ValueType.UNIX_TIMESTAMP,
         "INTEGER": ValueType.INT64,
+        "NUMERIC": ValueType.INT64,
         "INT64": ValueType.INT64,
         "STRING": ValueType.STRING,
         "FLOAT": ValueType.DOUBLE,
@@ -533,7 +539,8 @@ def bq_to_feast_value_type(bq_type_as_str: str) -> ValueType:
         "NULL": ValueType.NULL,
     }
 
-    value_type = type_map[bq_type_as_str]
+    value_type = type_map.get(bq_type_as_str, ValueType.STRING)
+
     if is_list:
         value_type = ValueType[value_type.name + "_LIST"]
 
@@ -839,7 +846,9 @@ def pg_type_to_feast_value_type(type_str: str) -> ValueType:
     return value
 
 
-def feast_value_type_to_pa(feast_type: ValueType) -> "pyarrow.DataType":
+def feast_value_type_to_pa(
+    feast_type: ValueType, timestamp_unit: str = "us"
+) -> "pyarrow.DataType":
     import pyarrow
 
     type_map = {
@@ -850,7 +859,7 @@ def feast_value_type_to_pa(feast_type: ValueType) -> "pyarrow.DataType":
         ValueType.STRING: pyarrow.string(),
         ValueType.BYTES: pyarrow.binary(),
         ValueType.BOOL: pyarrow.bool_(),
-        ValueType.UNIX_TIMESTAMP: pyarrow.timestamp("us"),
+        ValueType.UNIX_TIMESTAMP: pyarrow.timestamp(timestamp_unit),
         ValueType.INT32_LIST: pyarrow.list_(pyarrow.int32()),
         ValueType.INT64_LIST: pyarrow.list_(pyarrow.int64()),
         ValueType.DOUBLE_LIST: pyarrow.list_(pyarrow.float64()),
@@ -858,20 +867,33 @@ def feast_value_type_to_pa(feast_type: ValueType) -> "pyarrow.DataType":
         ValueType.STRING_LIST: pyarrow.list_(pyarrow.string()),
         ValueType.BYTES_LIST: pyarrow.list_(pyarrow.binary()),
         ValueType.BOOL_LIST: pyarrow.list_(pyarrow.bool_()),
-        ValueType.UNIX_TIMESTAMP_LIST: pyarrow.list_(pyarrow.timestamp("us")),
+        ValueType.UNIX_TIMESTAMP_LIST: pyarrow.list_(pyarrow.timestamp(timestamp_unit)),
         ValueType.NULL: pyarrow.null(),
     }
     return type_map[feast_type]
 
 
 def pg_type_code_to_pg_type(code: int) -> str:
-    return {
+    """Map the postgres type code a Feast type string
+
+    Rather than raise an exception on an unknown type, we return the
+    string representation of the type code. This way rather than raising
+    an exception on unknown types, Feast will just skip the problem columns.
+
+    Note that json and jsonb are not supported but this shows up in the
+    log as a warning. Since postgres allows custom types we return an unknown for those cases.
+
+    See: https://jdbc.postgresql.org/documentation/publicapi/index.html?constant-values.html
+    """
+    PG_TYPE_MAP = {
         16: "boolean",
         17: "bytea",
         20: "bigint",
         21: "smallint",
         23: "integer",
         25: "text",
+        114: "json",
+        199: "json[]",
         700: "real",
         701: "double precision",
         1000: "boolean[]",
@@ -897,7 +919,11 @@ def pg_type_code_to_pg_type(code: int) -> str:
         1700: "numeric",
         2950: "uuid",
         2951: "uuid[]",
-    }[code]
+        3802: "jsonb",
+        3807: "jsonb[]",
+    }
+
+    return PG_TYPE_MAP.get(code, "unknown")
 
 
 def pg_type_code_to_arrow(code: int) -> str:

@@ -82,6 +82,10 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "benchmark: mark benchmarking tests")
     config.addinivalue_line(
         "markers",
+        "universal_online_stores: mark tests that can be run against different online stores",
+    )
+    config.addinivalue_line(
+        "markers",
         "universal_offline_stores: mark tests that can be run against different offline stores",
     )
 
@@ -99,6 +103,7 @@ def pytest_addoption(parser):
         default=False,
         help="Run benchmark tests",
     )
+
 
 def pytest_collection_modifyitems(config, items: List[Item]):
     should_run_integration = config.getoption("--integration") is True
@@ -388,3 +393,17 @@ def feature_store_for_online_retrieval(
     ]
 
     return fs, feature_refs, entity_rows
+
+
+@pytest.fixture
+def fake_ingest_data():
+    """Fake data to ingest into the feature store"""
+    data = {
+        "driver_id": [1],
+        "conv_rate": [0.5],
+        "acc_rate": [0.6],
+        "avg_daily_trips": [4],
+        "event_timestamp": [pd.Timestamp(datetime.utcnow()).round("ms")],
+        "created": [pd.Timestamp(datetime.utcnow()).round("ms")],
+    }
+    return pd.DataFrame(data)

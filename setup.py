@@ -50,40 +50,51 @@ REQUIRED = [
     "colorama>=0.3.9,<1",
     "dill==0.3.*",
     "fastavro>=1.1.0,<2",
-    "google-api-core>=1.23.0,<3",
-    "googleapis-common-protos>=1.52.*,<2",
-    "grpcio==1.51.1",
-    "grpcio-reflection>=1.47.0,<2",
+    "grpcio>=1.56.2,<2",
+    "grpcio-tools>=1.56.2,<2",
+    "grpcio-reflection>=1.56.2,<2",
+    "grpcio-health-checking>=1.56.2,<2",
+    "mypy-protobuf==3.1",
     "Jinja2>=2,<4",
     "jsonschema",
     "mmh3",
-    "numpy<1.22,<3",
-    "pandas<1.4.3,<2",
-    "pandavro==1.5.*", # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
-    "protobuf<5,>3",
+    "numpy>=1.22,<1.25",
+    "pandas>=1.4.3,<2",
+    # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
+    "pandavro~=1.5.0",
+    # Higher than 4.23.4 seems to cause a seg fault
+    "protobuf<4.23.4,>3.20",
     "proto-plus>=1.20.0,<2",
-    "pyarrow>=4,<9",
+    "pyarrow>=4,<12",
     "pydantic>=1,<2",
     "pygments>=2.12.0,<3",
-    "PyYAML>=5.4.*,<7",
+    "PyYAML>=5.4.0,<7",
+    "requests",
     "SQLAlchemy[mypy]>1,<2",
     "tabulate>=0.8.0,<1",
     "tenacity>=7,<9",
     "toml>=0.10.0,<1",
     "tqdm>=4,<5",
-    "typeguard",
-    "fastapi>=0.68.0,<1",
+    "typeguard==2.13.3",
+    "fastapi>=0.68.0,<0.100",
     "uvicorn[standard]>=0.14.0,<1",
-    "dask>=2021.*",
+    "gunicorn",
+    "dask>=2021.1.0",
     "bowler",  # Needed for automatic repo upgrades
+    # FastAPI does not correctly pull starlette dependency on httpx see thread(https://github.com/tiangolo/fastapi/issues/5656).
+    "httpx>=0.23.3",
+    "importlib-resources>=6.0.0,<7",
+    "importlib_metadata>=6.8.0,<7"
 ]
 
 GCP_REQUIRED = [
+    "google-api-core>=1.23.0,<3",
+    "googleapis-common-protos>=1.52.0,<2",
     "google-cloud-bigquery[pandas]>=2,<4",
     "google-cloud-bigquery-storage >= 2.0.0,<3",
-    "google-cloud-datastore>=2.1.0,<3",
-    "google-cloud-storage>=1.34.0,<3",
-    "google-cloud-bigtable>=2.11.0,<3",
+    "google-cloud-datastore>=2.1.*,<3",
+    "google-cloud-storage>=1.34.*,<3",
+    "google-cloud-bigtable>=2.11.*,<3",
 ]
 
 REDIS_REQUIRED = [
@@ -139,6 +150,14 @@ AZURE_REQUIRED = [
     "pymssql",
 ]
 
+ROCKSET_REQUIRED = [
+    "rockset>=1.0.3",
+]
+
+HAZELCAST_REQUIRED = [
+    "hazelcast-python-client>=5.1",
+]
+
 CI_REQUIRED = (
     [
         "build",
@@ -182,6 +201,7 @@ CI_REQUIRED = (
         "types-requests",
         "types-setuptools",
         "types-tabulate",
+        "virtualenv<20.24.2"
     ]
     + GCP_REQUIRED
     + REDIS_REQUIRED
@@ -196,6 +216,8 @@ CI_REQUIRED = (
     + HBASE_REQUIRED
     + CASSANDRA_REQUIRED
     + AZURE_REQUIRED
+    + ROCKSET_REQUIRED
+    + HAZELCAST_REQUIRED
 )
 
 AFFIRM_REQUIRED = [
@@ -566,9 +588,10 @@ setup(
         "mysql": MYSQL_REQUIRED,
         "ge": GE_REQUIRED,
         "hbase": HBASE_REQUIRED,
-        "go": GO_REQUIRED,
         "docs": DOCS_REQUIRED,
         "cassandra": CASSANDRA_REQUIRED,
+        "hazelcast": HAZELCAST_REQUIRED,
+        "rockset": ROCKSET_REQUIRED,
     },
     include_package_data=True,
     license="Apache",
@@ -581,6 +604,7 @@ setup(
         "Programming Language :: Python :: 3.7",
     ],
     entry_points={"console_scripts": ["feast=feast.cli:cli"]},
+    use_scm_version=use_scm_version,
     setup_requires=[
         # "setuptools_scm",
         "grpcio==1.51.1",

@@ -18,6 +18,7 @@ from feast.errors import FeatureNameCollisionError
 from feast.feature_service import FeatureService
 from feast.feature_view import FeatureView
 from feast.field import Field
+from feast.infra.utils.postgres.postgres_config import ConnectionType
 from feast.online_response import TIMESTAMP_POSTFIX
 from feast.types import Float32, Int32, String
 from feast.wait import wait_retry_backoff
@@ -31,6 +32,42 @@ from tests.integration.feature_repos.universal.feature_views import (
     driver_feature_view,
 )
 from tests.utils.data_source_test_creator import prep_file_source
+
+
+@pytest.mark.integration
+@pytest.mark.universal_online_stores(only=["postgres"])
+def test_connection_pool_online_stores(
+    environment, universal_data_sources, fake_ingest_data
+):
+    if os.getenv("FEAST_IS_LOCAL_TEST", "False") == "True":
+        return
+    fs = environment.feature_store
+    fs.config.online_store.conn_type = ConnectionType.pool
+    fs.config.online_store.min_conn = 1
+    fs.config.online_store.max_conn = 10
+
+    entities, datasets, data_sources = universal_data_sources
+    driver_hourly_stats = create_driver_hourly_stats_feature_view(data_sources.driver)
+    driver_entity = driver()
+
+    # Register Feature View and Entity
+    fs.apply([driver_hourly_stats, driver_entity])
+
+    # directly ingest data into the Online Store
+    fs.write_to_online_store("driver_stats", fake_ingest_data)
+
+    # assert the right data is in the Online Store
+    df = fs.get_online_features(
+        features=[
+            "driver_stats:avg_daily_trips",
+            "driver_stats:acc_rate",
+            "driver_stats:conv_rate",
+        ],
+        entity_rows=[{"driver_id": 1}],
+    ).to_df()
+    assertpy.assert_that(df["avg_daily_trips"].iloc[0]).is_equal_to(4)
+    assertpy.assert_that(df["acc_rate"].iloc[0]).is_close_to(0.6, 1e-6)
+    assertpy.assert_that(df["conv_rate"].iloc[0]).is_close_to(0.5, 1e-6)
 
 
 @pytest.mark.integration
@@ -436,6 +473,7 @@ def test_online_retrieval_with_event_timestamps(
     assertpy.assert_that(df["conv_rate" + TIMESTAMP_POSTFIX].iloc[1]).is_equal_to(
         1646263600
     )
+
 
 @pytest.mark.integration
 @pytest.mark.universal_online_stores(only=["redis"])
