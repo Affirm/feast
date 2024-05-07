@@ -39,7 +39,7 @@ except ImportError:
     from distutils.core import setup
 
 NAME = "feast"
-VERSION = "0.28+affirm191"
+VERSION = "0.28+affirm193.dev2"
 DESCRIPTION = "Python SDK for Feast @ Affirm"
 URL = "https://github.com/feast-dev/feast"
 AUTHOR = "Feast"
@@ -203,12 +203,12 @@ AFFIRM_REQUIRED = [
     "colorama>=0.3.9,<1",
     "dill==0.3.*",
     "fastavro>=1.1.0,<2",
-    "grpcio==1.51.1",
+    "grpcio",
     "Jinja2>=2,<4",
     "jsonschema",
     "mmh3",
     "pandavro==1.5.*",  # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
-    "pyarrow>=14.0.2",
+    "pyarrow",
     "pydantic>=1,<2",
     "pygments>=2.12.0,<3",
     "SQLAlchemy[mypy]>1,<2",
@@ -223,14 +223,14 @@ AFFIRM_REQUIRED = [
     "google-api-core>=1.23.0,<2.7",
     "googleapis-common-protos==1.56.2",
     "grpcio-reflection",
-    "numpy<1.22,<2",
+    "numpy",
     "pandas>=1,<2",
     "protobuf",
     "proto-plus",
     "PyYAML>=5.1.2",
     "uvicorn[standard]",
     "tensorflow-metadata",
-    "dask==2021.12.0",
+    "dask",
 ]
 
 
