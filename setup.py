@@ -39,7 +39,7 @@ except ImportError:
     from distutils.core import setup
 
 NAME = "feast"
-VERSION = "0.28+affirm193.dev1"
+VERSION = "0.28+affirm193.dev2"
 DESCRIPTION = "Python SDK for Feast @ Affirm"
 URL = "https://github.com/feast-dev/feast"
 AUTHOR = "Feast"
@@ -208,7 +208,7 @@ AFFIRM_REQUIRED = [
     "jsonschema",
     "mmh3",
     "pandavro==1.5.*",  # For some reason pandavro higher than 1.5.* only support pandas less than 1.3.
-    "pyarrow>=14.0.2",
+    "pyarrow",
     "pydantic>=1,<2",
     "pygments>=2.12.0,<3",
     "SQLAlchemy[mypy]>1,<2",
