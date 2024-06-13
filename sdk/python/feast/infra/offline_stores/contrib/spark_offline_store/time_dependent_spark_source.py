@@ -131,6 +131,21 @@ class TimeDependentSparkSource(SparkSource):
             field_mapping=dict(data_source.field_mapping),
         )
 
+    def __copy__(self):
+        return TimeDependentSparkSource(
+            name=self.name,
+            path_prefix=self.path_prefix,
+            time_fmt_str=self.time_fmt_str,
+            path_suffix=self.path_suffix,
+            file_format=self.spark_options.file_format,
+            created_timestamp_column=self.created_timestamp_column,
+            timestamp_field=self.timestamp_field,
+            field_mapping=dict(self.field_mapping),
+            tags=dict(self.tags),
+            owner=self.owner,
+            description=self.description,
+        )
+
     def get_paths_in_date_range(self, start_date: datetime, end_date: datetime) -> List[str]:
         current_date = start_date
         paths = []

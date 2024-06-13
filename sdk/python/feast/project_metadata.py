@@ -109,3 +109,9 @@ class ProjectMetadata:
         return ProjectMetadataProto(
             project=self.project_name, project_uuid=self.project_uuid
         )
+
+    def __copy__(self) -> "ProjectMetadata":
+        return ProjectMetadata(
+            project_name=self.project_name,
+            project_uuid=self.project_uuid
+        )

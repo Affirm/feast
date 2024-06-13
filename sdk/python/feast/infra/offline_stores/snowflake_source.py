@@ -118,6 +118,22 @@ class SnowflakeSource(DataSource):
             owner=data_source.owner,
         )
 
+    def __copy__(self):
+        return SnowflakeSource(
+            name=self.name,
+            timestamp_field=self.timestamp_field,
+            database=self.snowflake_options.database,
+            schema=self.snowflake_options.schema,
+            table=self.snowflake_options.table,
+            warehouse=self.snowflake_options.warehouse,
+            created_timestamp_column=self.created_timestamp_column,
+            field_mapping=dict(self.field_mapping),
+            query=self.query,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner
+        )
+
     # Note: Python requires redefining hash in child classes that override __eq__
     def __hash__(self):
         return super().__hash__()
@@ -407,6 +423,9 @@ class SavedDatasetSnowflakeStorage(SavedDatasetStorage):
         return SavedDatasetStorageProto(
             snowflake_storage=self.snowflake_options.to_proto()
         )
+
+    def __copy__(self) -> "SavedDatasetSnowflakeStorage":
+        return SavedDatasetSnowflakeStorage(table_ref=self.snowflake_options.table)
 
     def to_data_source(self) -> DataSource:
         return SnowflakeSource(table=self.snowflake_options.table)

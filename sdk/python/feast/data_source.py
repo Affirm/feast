@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import copy
 import enum
 import warnings
 from abc import ABC, abstractmethod
@@ -96,6 +96,13 @@ class KafkaOptions:
 
         return kafka_options_proto
 
+    def __copy__(self):
+        return KafkaOptions(
+            kafka_bootstrap_servers=self.kafka_bootstrap_servers,
+            message_format=copy.copy(self.message_format),
+            topic=self.topic,
+            watermark_delay_threshold=self.watermark_delay_threshold
+        )
 
 class KinesisOptions:
     """
@@ -147,6 +154,13 @@ class KinesisOptions:
         )
 
         return kinesis_options_proto
+
+    def __copy__(self):
+        return KinesisOptions(
+            record_format=copy.copy(self.record_format),
+            region=self.region,
+            stream_name=self.stream_name
+        )
 
 
 _DATA_SOURCE_OPTIONS = {
@@ -484,6 +498,22 @@ class KafkaSource(DataSource):
             data_source_proto.batch_source.MergeFrom(self.batch_source.to_proto())
         return data_source_proto
 
+    def __copy__(self):
+        return KafkaSource(
+            name=self.name,
+            field_mapping=dict(self.field_mapping),
+            kafka_bootstrap_servers=self.kafka_options.kafka_bootstrap_servers,
+            message_format=self.kafka_options.message_format,
+            watermark_delay_threshold=self.kafka_options.watermark_delay_threshold,
+            topic=self.kafka_options.topic,
+            created_timestamp_column=self.created_timestamp_column,
+            timestamp_field=self.timestamp_field,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner,
+            batch_source=copy.copy(self.batch_source) if self.batch_source else None
+        )
+
     def validate(self, config: RepoConfig):
         pass
 
@@ -577,7 +607,6 @@ class RequestSource(DataSource):
         )
 
     def to_proto(self) -> DataSourceProto:
-
         schema_pb = []
 
         if isinstance(self.schema, Dict):
@@ -598,6 +627,15 @@ class RequestSource(DataSource):
         data_source_proto.request_data_options.schema.extend(schema_pb)
 
         return data_source_proto
+
+    def __copy__(self):
+        return RequestSource(
+            name=self.name,
+            schema=[copy.copy(field) for field in self.schema],
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner
+        )
 
     def get_table_query_string(self) -> str:
         raise NotImplementedError
@@ -635,6 +673,21 @@ class KinesisSource(DataSource):
             batch_source=DataSource.from_proto(data_source.batch_source)
             if data_source.batch_source
             else None,
+        )
+
+    def __copy__(self):
+        return KinesisSource(
+            name=self.name,
+            timestamp_field=self.timestamp_field,
+            field_mapping=dict(self.field_mapping),
+            record_format=copy.copy(self.kinesis_options.record_format),
+            region=self.kinesis_options.region,
+            stream_name=self.kinesis_options.stream_name,
+            created_timestamp_column=self.created_timestamp_column,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner,
+            batch_source=copy.copy(self.batch_source) if self.batch_source else None,
         )
 
     @staticmethod
@@ -807,6 +860,15 @@ class PushSource(DataSource):
         )
 
         return data_source_proto
+
+    def __copy__(self):
+        return PushSource(
+            name=self.name,
+            batch_source=copy.copy(self.batch_source),
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner
+        )
 
     def get_table_query_string(self) -> str:
         raise NotImplementedError

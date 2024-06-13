@@ -106,6 +106,21 @@ class AthenaSource(DataSource):
             tags=dict(data_source.tags),
         )
 
+    def __copy__(self):
+        return AthenaSource(
+            name=self.name,
+            timestamp_field=self.timestamp_field,
+            table=self.athena_options.table,
+            database=self.athena_options.database,
+            data_source=self.athena_options.data_source,
+            created_timestamp_column=self.created_timestamp_column,
+            field_mapping=dict(self.field_mapping),
+            date_partition_column=self.date_partition_column,
+            query=self.query,
+            description=self.description,
+            tags=dict(self.tags)
+        )
+
     # Note: Python requires redefining hash in child classes that override __eq__
     def __hash__(self):
         return super().__hash__()
@@ -338,6 +353,11 @@ class AthenaLoggingDestination(LoggingDestination):
             athena_destination=LoggingConfigProto.AthenaDestination(
                 table_name=self.table_name
             )
+        )
+
+    def __copy__(self) -> "LoggingDestination":
+        return AthenaLoggingDestination(
+            table_name=self.table_name
         )
 
     def to_data_source(self) -> DataSource:

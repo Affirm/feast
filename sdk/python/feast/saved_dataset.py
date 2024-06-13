@@ -2,6 +2,7 @@ from abc import abstractmethod
 from datetime import datetime
 from typing import TYPE_CHECKING, Dict, List, Optional, Type, cast
 
+import copy
 import pandas as pd
 import pyarrow
 from google.protobuf.json_format import MessageToJson
@@ -208,6 +209,23 @@ class SavedDataset:
         saved_dataset_proto = SavedDatasetProto(spec=spec, meta=meta)
         return saved_dataset_proto
 
+    def __copy__(self) -> "SavedDataset":
+        ds = SavedDataset(
+            name=self.name,
+            features=list(self.features),
+            join_keys=list(self.join_keys),
+            full_feature_names=self.full_feature_names,
+            storage=copy.copy(self.storage),
+            tags=dict(self.tags),
+            feature_service_name=self.feature_service_name
+        )
+
+        ds.created_timestamp = self.created_timestamp
+        ds.last_updated_timestamp = self.last_updated_timestamp
+        ds.min_event_timestamp = self.min_event_timestamp
+        ds.max_event_timestamp = self.max_event_timestamp
+        return ds
+
     def with_retrieval_job(self, retrieval_job: "RetrievalJob") -> "SavedDataset":
         self._retrieval_job = retrieval_job
         return self
@@ -350,3 +368,12 @@ class ValidationReference:
         )
 
         return proto
+
+    def __copy__(self) -> "ValidationReference":
+        return ValidationReference(
+            name=self.name,
+            dataset_name=self.dataset_name,
+            profiler=self.profiler,
+            description=self.description,
+            tags=dict(self.tags)
+        )

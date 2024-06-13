@@ -67,7 +67,7 @@ class Field:
 
         if (
             self.name != other.name
-            or self.dtype != other.dtype
+            or self.dtype.to_value_type() != other.dtype.to_value_type()
             or self.description != other.description
             or self.tags != other.tags
         ):
@@ -109,6 +109,14 @@ class Field:
             name=field_proto.name,
             dtype=from_value_type(value_type=value_type),
             tags=dict(field_proto.tags),
+        )
+
+    def __copy__(self) -> "Field":
+        return Field(
+            name=self.name,
+            dtype=self.dtype,
+            tags=dict(self.tags),
+            description=self.description
         )
 
     @classmethod

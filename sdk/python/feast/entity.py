@@ -192,3 +192,18 @@ class Entity:
         )
 
         return EntityProto(spec=spec, meta=meta)
+
+    def __copy__(self) -> "Entity":
+        entity = Entity(
+            name=self.name,
+            value_type=self.value_type,
+            join_keys=[self.join_key],
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner
+        )
+
+        # mirror `from_proto`
+        entity.created_timestamp = self.created_timestamp
+        entity.last_updated_timestamp = self.last_updated_timestamp
+        return entity
