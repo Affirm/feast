@@ -18,6 +18,10 @@ Please see [Online Store](../../getting-started/architecture-and-components/onli
 [redis.md](redis.md)
 {% endcontent-ref %}
 
+{% content-ref url="dragonfly.md" %}
+[dragonfly.md](dragonfly.md)
+{% endcontent-ref %}
+
 {% content-ref url="datastore.md" %}
 [datastore.md](datastore.md)
 {% endcontent-ref %}
@@ -41,4 +45,13 @@ Please see [Online Store](../../getting-started/architecture-and-components/onli
 {% content-ref url="mysql.md" %}
 [mysql.md](mysql.md)
 {% endcontent-ref %}
+
+{% content-ref url="rockset.md" %}
+[rockset.md](rockset.md)
+{% endcontent-ref %}
+
+{% content-ref url="hazelcast.md" %}
+[hazelcast.md](hazelcast.md)
+{% endcontent-ref %}
+
 

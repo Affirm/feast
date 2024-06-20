@@ -363,7 +363,7 @@ class BigQueryOfflineStore(OfflineStore):
         assert isinstance(feature_view.batch_source, BigQuerySource)
 
         pa_schema, column_names = offline_utils.get_pyarrow_schema_from_batch_source(
-            config, feature_view.batch_source
+            config, feature_view.batch_source, timestamp_unit="ns"
         )
         if column_names != table.column_names:
             raise ValueError(
@@ -441,9 +441,11 @@ class BigQueryRetrievalJob(RetrievalJob):
     def on_demand_feature_views(self) -> List[OnDemandFeatureView]:
         return self._on_demand_feature_views
 
-    def _to_df_internal(self) -> pd.DataFrame:
+    def _to_df_internal(self, timeout: Optional[int] = None) -> pd.DataFrame:
         with self._query_generator() as query:
-            df = self._execute_query(query).to_dataframe(create_bqstorage_client=True)
+            df = self._execute_query(query=query, timeout=timeout).to_dataframe(
+                create_bqstorage_client=True
+            )
             return df
 
     def to_sql(self) -> str:
@@ -454,8 +456,8 @@ class BigQueryRetrievalJob(RetrievalJob):
     def to_bigquery(
         self,
         job_config: Optional[bigquery.QueryJobConfig] = None,
-        timeout: int = 1800,
-        retry_cadence: int = 10,
+        timeout: Optional[int] = 1800,
+        retry_cadence: Optional[int] = 10,
     ) -> str:
         """
         Synchronously executes the underlying query and exports the result to a BigQuery table. The
@@ -488,20 +490,34 @@ class BigQueryRetrievalJob(RetrievalJob):
             return str(job_config.destination)
 
         with self._query_generator() as query:
-            self._execute_query(query, job_config, timeout)
+            dest = job_config.destination
+            # because setting destination for scripts is not valid
+            # remove destination attribute if provided
+            job_config.destination = None
+            bq_job = self._execute_query(query, job_config, timeout)
 
-            print(f"Done writing to '{job_config.destination}'.")
-            return str(job_config.destination)
+            if not job_config.dry_run:
+                config = bq_job.to_api_repr()["configuration"]
+                # get temp table created by BQ
+                tmp_dest = config["query"]["destinationTable"]
+                temp_dest_table = f"{tmp_dest['projectId']}.{tmp_dest['datasetId']}.{tmp_dest['tableId']}"
 
-    def _to_arrow_internal(self) -> pyarrow.Table:
+                # persist temp table
+                sql = f"CREATE TABLE `{dest}` AS SELECT * FROM {temp_dest_table}"
+                self._execute_query(sql, timeout=timeout)
+
+            print(f"Done writing to '{dest}'.")
+            return str(dest)
+
+    def _to_arrow_internal(self, timeout: Optional[int] = None) -> pyarrow.Table:
         with self._query_generator() as query:
-            q = self._execute_query(query=query)
+            q = self._execute_query(query=query, timeout=timeout)
             assert q
             return q.to_arrow()
 
     @log_exceptions_and_usage
     def _execute_query(
-        self, query, job_config=None, timeout: int = 1800
+        self, query, job_config=None, timeout: Optional[int] = None
     ) -> Optional[bigquery.job.query.QueryJob]:
         bq_job = self.client.query(query, job_config=job_config)
 
@@ -511,14 +527,20 @@ class BigQueryRetrievalJob(RetrievalJob):
             )
             return None
 
-        block_until_done(client=self.client, bq_job=bq_job, timeout=timeout)
+        block_until_done(client=self.client, bq_job=bq_job, timeout=timeout or 1800)
         return bq_job
 
-    def persist(self, storage: SavedDatasetStorage, allow_overwrite: bool = False):
+    def persist(
+        self,
+        storage: SavedDatasetStorage,
+        allow_overwrite: Optional[bool] = False,
+        timeout: Optional[int] = None,
+    ):
         assert isinstance(storage, SavedDatasetBigQueryStorage)
 
         self.to_bigquery(
-            bigquery.QueryJobConfig(destination=storage.bigquery_options.table)
+            bigquery.QueryJobConfig(destination=storage.bigquery_options.table),
+            timeout=timeout,
         )
 
     @property
@@ -555,7 +577,6 @@ class BigQueryRetrievalJob(RetrievalJob):
         else:
             storage_client = StorageClient(project=self.client.project)
         bucket, prefix = self._gcs_path[len("gs://") :].split("/", 1)
-        prefix = prefix.rsplit("/", 1)[0]
         if prefix.startswith("/"):
             prefix = prefix[1:]
 
@@ -647,7 +668,7 @@ def _upload_entity_df(
     job: Union[bigquery.job.query.QueryJob, bigquery.job.load.LoadJob]
 
     if isinstance(entity_df, str):
-        job = client.query(f"CREATE TABLE {table_name} AS ({entity_df})")
+        job = client.query(f"CREATE TABLE `{table_name}` AS ({entity_df})")
 
     elif isinstance(entity_df, pd.DataFrame):
         # Drop the index so that we don't have unnecessary columns
@@ -671,7 +692,7 @@ def _get_entity_schema(
 ) -> Dict[str, np.dtype]:
     if isinstance(entity_df, str):
         entity_df_sample = (
-            client.query(f"SELECT * FROM ({entity_df}) LIMIT 1").result().to_dataframe()
+            client.query(f"SELECT * FROM ({entity_df}) LIMIT 0").result().to_dataframe()
         )
 
         entity_schema = dict(zip(entity_df_sample.columns, entity_df_sample.dtypes))
@@ -777,7 +798,7 @@ MULTIPLE_FEATURE_VIEW_POINT_IN_TIME_JOIN = """
  Compute a deterministic hash for the `left_table_query_string` that will be used throughout
  all the logic as the field to GROUP BY the data
 */
-WITH entity_dataframe AS (
+CREATE TEMP TABLE entity_dataframe AS (
     SELECT *,
         {{entity_df_event_timestamp_col}} AS entity_timestamp
         {% for featureview in featureviews %}
@@ -793,95 +814,95 @@ WITH entity_dataframe AS (
             {% endif %}
         {% endfor %}
     FROM `{{ left_table_query_string }}`
-),
+);
 
 {% for featureview in featureviews %}
+CREATE TEMP TABLE {{ featureview.name }}__cleaned AS (
+    WITH {{ featureview.name }}__entity_dataframe AS (
+        SELECT
+            {{ featureview.entities | join(', ')}}{% if featureview.entities %},{% else %}{% endif %}
+            entity_timestamp,
+            {{featureview.name}}__entity_row_unique_id
+        FROM entity_dataframe
+        GROUP BY
+            {{ featureview.entities | join(', ')}}{% if featureview.entities %},{% else %}{% endif %}
+            entity_timestamp,
+            {{featureview.name}}__entity_row_unique_id
+    ),
 
-{{ featureview.name }}__entity_dataframe AS (
-    SELECT
-        {{ featureview.entities | join(', ')}}{% if featureview.entities %},{% else %}{% endif %}
-        entity_timestamp,
-        {{featureview.name}}__entity_row_unique_id
-    FROM entity_dataframe
-    GROUP BY
-        {{ featureview.entities | join(', ')}}{% if featureview.entities %},{% else %}{% endif %}
-        entity_timestamp,
-        {{featureview.name}}__entity_row_unique_id
-),
+    /*
+    This query template performs the point-in-time correctness join for a single feature set table
+    to the provided entity table.
 
-/*
- This query template performs the point-in-time correctness join for a single feature set table
- to the provided entity table.
+    1. We first join the current feature_view to the entity dataframe that has been passed.
+    This JOIN has the following logic:
+        - For each row of the entity dataframe, only keep the rows where the `timestamp_field`
+        is less than the one provided in the entity dataframe
+        - If there a TTL for the current feature_view, also keep the rows where the `timestamp_field`
+        is higher the the one provided minus the TTL
+        - For each row, Join on the entity key and retrieve the `entity_row_unique_id` that has been
+        computed previously
 
- 1. We first join the current feature_view to the entity dataframe that has been passed.
- This JOIN has the following logic:
-    - For each row of the entity dataframe, only keep the rows where the `timestamp_field`
-    is less than the one provided in the entity dataframe
-    - If there a TTL for the current feature_view, also keep the rows where the `timestamp_field`
-    is higher the the one provided minus the TTL
-    - For each row, Join on the entity key and retrieve the `entity_row_unique_id` that has been
-    computed previously
+    The output of this CTE will contain all the necessary information and already filtered out most
+    of the data that is not relevant.
+    */
 
- The output of this CTE will contain all the necessary information and already filtered out most
- of the data that is not relevant.
-*/
-
-{{ featureview.name }}__subquery AS (
-    SELECT
-        {{ featureview.timestamp_field }} as event_timestamp,
-        {{ featureview.created_timestamp_column ~ ' as created_timestamp,' if featureview.created_timestamp_column else '' }}
-        {{ featureview.entity_selections | join(', ')}}{% if featureview.entity_selections %},{% else %}{% endif %}
-        {% for feature in featureview.features %}
-            {{ feature }} as {% if full_feature_names %}{{ featureview.name }}__{{featureview.field_mapping.get(feature, feature)}}{% else %}{{ featureview.field_mapping.get(feature, feature) }}{% endif %}{% if loop.last %}{% else %}, {% endif %}
-        {% endfor %}
-    FROM {{ featureview.table_subquery }}
-    WHERE {{ featureview.timestamp_field }} <= '{{ featureview.max_event_timestamp }}'
-    {% if featureview.ttl == 0 %}{% else %}
-    AND {{ featureview.timestamp_field }} >= '{{ featureview.min_event_timestamp }}'
-    {% endif %}
-),
-
-{{ featureview.name }}__base AS (
-    SELECT
-        subquery.*,
-        entity_dataframe.entity_timestamp,
-        entity_dataframe.{{featureview.name}}__entity_row_unique_id
-    FROM {{ featureview.name }}__subquery AS subquery
-    INNER JOIN {{ featureview.name }}__entity_dataframe AS entity_dataframe
-    ON TRUE
-        AND subquery.event_timestamp <= entity_dataframe.entity_timestamp
-
+    {{ featureview.name }}__subquery AS (
+        SELECT
+            {{ featureview.timestamp_field }} as event_timestamp,
+            {{ featureview.created_timestamp_column ~ ' as created_timestamp,' if featureview.created_timestamp_column else '' }}
+            {{ featureview.entity_selections | join(', ')}}{% if featureview.entity_selections %},{% else %}{% endif %}
+            {% for feature in featureview.features %}
+                {{ feature }} as {% if full_feature_names %}{{ featureview.name }}__{{featureview.field_mapping.get(feature, feature)}}{% else %}{{ featureview.field_mapping.get(feature, feature) }}{% endif %}{% if loop.last %}{% else %}, {% endif %}
+            {% endfor %}
+        FROM {{ featureview.table_subquery }}
+        WHERE {{ featureview.timestamp_field }} <= '{{ featureview.max_event_timestamp }}'
         {% if featureview.ttl == 0 %}{% else %}
-        AND subquery.event_timestamp >= Timestamp_sub(entity_dataframe.entity_timestamp, interval {{ featureview.ttl }} second)
+        AND {{ featureview.timestamp_field }} >= '{{ featureview.min_event_timestamp }}'
         {% endif %}
+    ),
 
-        {% for entity in featureview.entities %}
-        AND subquery.{{ entity }} = entity_dataframe.{{ entity }}
-        {% endfor %}
-),
+    {{ featureview.name }}__base AS (
+        SELECT
+            subquery.*,
+            entity_dataframe.entity_timestamp,
+            entity_dataframe.{{featureview.name}}__entity_row_unique_id
+        FROM {{ featureview.name }}__subquery AS subquery
+        INNER JOIN {{ featureview.name }}__entity_dataframe AS entity_dataframe
+        ON TRUE
+            AND subquery.event_timestamp <= entity_dataframe.entity_timestamp
 
-/*
- 2. If the `created_timestamp_column` has been set, we need to
- deduplicate the data first. This is done by calculating the
- `MAX(created_at_timestamp)` for each event_timestamp.
- We then join the data on the next CTE
-*/
-{% if featureview.created_timestamp_column %}
-{{ featureview.name }}__dedup AS (
-    SELECT
-        {{featureview.name}}__entity_row_unique_id,
-        event_timestamp,
-        MAX(created_timestamp) as created_timestamp
-    FROM {{ featureview.name }}__base
-    GROUP BY {{featureview.name}}__entity_row_unique_id, event_timestamp
-),
-{% endif %}
+            {% if featureview.ttl == 0 %}{% else %}
+            AND subquery.event_timestamp >= Timestamp_sub(entity_dataframe.entity_timestamp, interval {{ featureview.ttl }} second)
+            {% endif %}
 
-/*
- 3. The data has been filtered during the first CTE "*__base"
- Thus we only need to compute the latest timestamp of each feature.
-*/
-{{ featureview.name }}__latest AS (
+            {% for entity in featureview.entities %}
+            AND subquery.{{ entity }} = entity_dataframe.{{ entity }}
+            {% endfor %}
+    ),
+
+    /*
+    2. If the `created_timestamp_column` has been set, we need to
+    deduplicate the data first. This is done by calculating the
+    `MAX(created_at_timestamp)` for each event_timestamp.
+    We then join the data on the next CTE
+    */
+    {% if featureview.created_timestamp_column %}
+    {{ featureview.name }}__dedup AS (
+        SELECT
+            {{featureview.name}}__entity_row_unique_id,
+            event_timestamp,
+            MAX(created_timestamp) as created_timestamp
+        FROM {{ featureview.name }}__base
+        GROUP BY {{featureview.name}}__entity_row_unique_id, event_timestamp
+    ),
+    {% endif %}
+
+    /*
+    3. The data has been filtered during the first CTE "*__base"
+    Thus we only need to compute the latest timestamp of each feature.
+    */
+    {{ featureview.name }}__latest AS (
     SELECT
         event_timestamp,
         {% if featureview.created_timestamp_column %}created_timestamp,{% endif %}
@@ -900,13 +921,13 @@ WITH entity_dataframe AS (
         {% endif %}
     )
     WHERE row_number = 1
-),
+)
 
 /*
  4. Once we know the latest value of each feature for a given timestamp,
  we can join again the data back to the original "base" dataset
 */
-{{ featureview.name }}__cleaned AS (
+
     SELECT base.*
     FROM {{ featureview.name }}__base as base
     INNER JOIN {{ featureview.name }}__latest
@@ -917,7 +938,7 @@ WITH entity_dataframe AS (
             ,created_timestamp
         {% endif %}
     )
-){% if loop.last %}{% else %}, {% endif %}
+);
 
 
 {% endfor %}

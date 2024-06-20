@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -102,6 +103,8 @@ from feast.version import get_version
 
 warnings.simplefilter("once", DeprecationWarning)
 
+if TYPE_CHECKING:
+    from feast.embedded_go.online_features_service import EmbeddedOnlineFeatureServer
 
 # decorator needed to use lru_cache with list arguments in `FeatureStore._get_feature_views_to_use()`
 def featuresListToTuple(function):
@@ -703,7 +706,7 @@ class FeatureStore:
 
         Args:
             desired_repo_contents: The desired repo state.
-x
+
         Raises:
             ValueError: The 'objects' parameter could not be parsed properly.
 
@@ -2086,7 +2089,7 @@ x
         )
 
         processed_read_rows_list = [
-            self._process_read_rows(read_rows, requested_features) 
+            self._process_read_rows(read_rows, requested_features)
             for read_rows, requested_features in zip(read_rows_list, requested_features_list)
         ]
         return processed_read_rows_list
@@ -2273,7 +2276,6 @@ x
         allow_cache=False,
         hide_dummy_entity: bool = True,
     ) -> Tuple[List[FeatureView], List[RequestFeatureView], List[OnDemandFeatureView]]:
-
         fvs = {
             fv.name: fv
             for fv in [
@@ -2344,6 +2346,8 @@ x
         type_: str,
         no_access_log: bool,
         no_feature_log: bool,
+        workers: int,
+        keep_alive_timeout: int,
     ) -> None:
         """Start the feature consumption server locally on a given port."""
         type_ = type_.lower()
@@ -2352,7 +2356,14 @@ x
                 f"Python server only supports 'http'. Got '{type_}' instead."
             )
         # Start the python server
-        feature_server.start_server(self, host, port, no_access_log)
+        feature_server.start_server(
+            self,
+            host=host,
+            port=port,
+            no_access_log=no_access_log,
+            workers=workers,
+            keep_alive_timeout=keep_alive_timeout,
+        )
 
     @log_exceptions_and_usage
     def get_feature_server_endpoint(self) -> Optional[str]:

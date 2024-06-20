@@ -2,7 +2,7 @@ import json
 import threading
 from typing import Callable, Optional
 
-import pkg_resources
+import importlib_resources
 import uvicorn
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,11 +13,9 @@ import feast
 
 def get_app(
     store: "feast.FeatureStore",
-    get_registry_dump: Callable,
     project_id: str,
     registry_ttl_secs: int,
-    host: str,
-    port: int,
+    root_path: str = "",
 ):
     app = FastAPI()
 
@@ -53,20 +51,21 @@ def get_app(
 
     async_refresh()
 
-    ui_dir = pkg_resources.resource_filename(__name__, "ui/build/")
-    # Initialize with the projects-list.json file
-    with open(ui_dir + "projects-list.json", mode="w") as f:
-        projects_dict = {
-            "projects": [
-                {
-                    "name": "Project",
-                    "description": "Test project",
-                    "id": project_id,
-                    "registryPath": "/registry",
-                }
-            ]
-        }
-        f.write(json.dumps(projects_dict))
+    ui_dir_ref = importlib_resources.files(__name__) / "ui/build/"
+    with importlib_resources.as_file(ui_dir_ref) as ui_dir:
+        # Initialize with the projects-list.json file
+        with ui_dir.joinpath("projects-list.json").open(mode="w") as f:
+            projects_dict = {
+                "projects": [
+                    {
+                        "name": "Project",
+                        "description": "Test project",
+                        "id": project_id,
+                        "registryPath": f"{root_path}/registry",
+                    }
+                ]
+            }
+            f.write(json.dumps(projects_dict))
 
     @app.get("/registry")
     def read_registry():
@@ -101,14 +100,12 @@ def start_server(
     get_registry_dump: Callable,
     project_id: str,
     registry_ttl_sec: int,
-    root_path: Optional[str] = "",
+    root_path: str = "",
 ):
     app = get_app(
         store,
-        get_registry_dump,
         project_id,
         registry_ttl_sec,
-        host,
-        port,
+        root_path,
     )
-    uvicorn.run(app, host=host, port=port, root_path=root_path)
+    uvicorn.run(app, host=host, port=port)

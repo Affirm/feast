@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timedelta
 from enum import Enum
@@ -5,6 +6,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Callable, List, Optional, Set, Union
 
+from pydantic import StrictStr
 from sqlalchemy import (  # type: ignore
     BigInteger,
     Column,
@@ -178,6 +180,17 @@ feast_metadata = Table(
     Column("last_updated_timestamp", BigInteger, nullable=False),
 )
 
+logger = logging.getLogger(__name__)
+
+
+class SqlRegistryConfig(RegistryConfig):
+    registry_type: StrictStr = "sql"
+    """ str: Provider name or a class name that implements Registry."""
+
+    path: StrictStr = ""
+    """ str: Path to metadata store.
+    If registry_type is 'sql', then this is a database URL as expected by SQLAlchemy """
+
 
 class SqlRegistry(BaseRegistry):
     def __init__(
@@ -257,6 +270,7 @@ class SqlRegistry(BaseRegistry):
             )
 
             if expired:
+                logger.info("Registry cache expired, so refreshing")
                 self.refresh()
 
     def get_stream_feature_view(

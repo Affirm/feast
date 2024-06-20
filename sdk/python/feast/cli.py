@@ -25,6 +25,7 @@ import pkg_resources
 import yaml
 from colorama import Fore, Style
 from dateutil import parser
+from importlib_metadata import version as importlib_version
 from pygments import formatters, highlight, lexers
 
 from feast import utils
@@ -35,11 +36,13 @@ from feast.constants import (
 from feast.errors import FeastObjectNotFoundException, FeastProviderLoginError
 from feast.feature_store import FeatureStore
 from feast.feature_view import FeatureView
+from feast.infra.contrib.grpc_server import get_grpc_server
 from feast.on_demand_feature_view import OnDemandFeatureView
 from feast.repo_config import load_repo_config
 from feast.repo_operations import (
     apply_total,
     cli_check_repo,
+    create_feature_store,
     generate_project_name,
     init_repo,
     plan,
@@ -172,10 +175,7 @@ def ui(
     """
     Shows the Feast UI over the current directory
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
     # Pass in the registry_dump method to get around a circular dependency
     store.serve_ui(
         host=host,
@@ -192,10 +192,7 @@ def endpoint(ctx: click.Context):
     """
     Display feature server endpoints
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
     endpoint = store.get_feature_server_endpoint()
     if endpoint is not None:
         _logger.info(
@@ -220,10 +217,7 @@ def data_source_describe(ctx: click.Context, name: str):
     """
     Describe a data source
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
 
     try:
         data_source = store.get_data_source(name)
@@ -244,10 +238,7 @@ def data_source_list(ctx: click.Context):
     """
     List all data sources
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
     table = []
     for datasource in store.list_data_sources():
         table.append([datasource.name, datasource.__class__])
@@ -272,10 +263,7 @@ def entity_describe(ctx: click.Context, name: str):
     """
     Describe an entity
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
 
     try:
         entity = store.get_entity(name)
@@ -296,10 +284,7 @@ def entity_list(ctx: click.Context):
     """
     List all entities
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
     table = []
     for entity in store.list_entities():
         table.append([entity.name, entity.description, entity.value_type])
@@ -324,10 +309,7 @@ def feature_service_describe(ctx: click.Context, name: str):
     """
     Describe a feature service
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
 
     try:
         feature_service = store.get_feature_service(name)
@@ -350,10 +332,7 @@ def feature_service_list(ctx: click.Context):
     """
     List all feature services
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
     feature_services = []
     for feature_service in store.list_feature_services():
         feature_names = []
@@ -383,10 +362,7 @@ def feature_view_describe(ctx: click.Context, name: str):
     """
     Describe a feature view
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
 
     try:
         feature_view = store.get_feature_view(name)
@@ -407,11 +383,7 @@ def feature_view_list(ctx: click.Context):
     """
     List all feature views
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
     table = []
     for feature_view in [
         *store.list_feature_views(),
@@ -452,10 +424,7 @@ def on_demand_feature_view_describe(ctx: click.Context, name: str):
     """
     [Experimental] Describe an on demand feature view
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
 
     try:
         on_demand_feature_view = store.get_on_demand_feature_view(name)
@@ -478,10 +447,7 @@ def on_demand_feature_view_list(ctx: click.Context):
     """
     [Experimental] List all on demand feature views
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
     table = []
     for on_demand_feature_view in store.list_on_demand_feature_views():
         table.append([on_demand_feature_view.name])
@@ -583,10 +549,8 @@ def materialize_command(
 
     START_TS and END_TS should be in ISO 8601 format, e.g. '2021-07-16T19:20:01'
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
+
     store.materialize(
         feature_views=None if not views else views,
         start_date=utils.make_tzaware(parser.parse(start_ts)),
@@ -612,10 +576,7 @@ def materialize_incremental_command(ctx: click.Context, end_ts: str, views: List
 
     END_TS should be in ISO 8601 format, e.g. '2021-07-16T19:20:01'
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
     store.materialize_incremental(
         feature_views=None if not views else views,
         end_date=utils.make_tzaware(datetime.fromisoformat(end_ts)),
@@ -631,7 +592,18 @@ def materialize_incremental_command(ctx: click.Context, end_ts: str, views: List
     "--template",
     "-t",
     type=click.Choice(
-        ["local", "gcp", "aws", "snowflake", "spark", "postgres", "hbase", "cassandra"],
+        [
+            "local",
+            "gcp",
+            "aws",
+            "snowflake",
+            "spark",
+            "postgres",
+            "hbase",
+            "cassandra",
+            "rockset",
+            "hazelcast",
+        ],
         case_sensitive=False,
     ),
     help="Specify a template for the created project",
@@ -686,6 +658,21 @@ def init_command(project_directory, minimal: bool, template: str):
     show_default=True,
     help="Disable logging served features",
 )
+@click.option(
+    "--workers",
+    "-w",
+    type=click.INT,
+    default=1,
+    show_default=True,
+    help="Number of worker",
+)
+@click.option(
+    "--keep-alive-timeout",
+    type=click.INT,
+    default=5,
+    show_default=True,
+    help="Timeout for keep alive",
+)
 @click.pass_context
 def serve_command(
     ctx: click.Context,
@@ -694,27 +681,50 @@ def serve_command(
     type_: str,
     no_access_log: bool,
     no_feature_log: bool,
+    workers: int,
+    keep_alive_timeout: int,
 ):
     """Start a feature server locally on a given port."""
-    repo = ctx.obj["CHDIR"]
+    store = create_feature_store(ctx)
 
-    # If we received a base64 encoded version of feature_store.yaml, use that
-    config_base64 = os.getenv(FEATURE_STORE_YAML_ENV_NAME)
-    if config_base64:
-        print("Received base64 encoded feature_store.yaml")
-        config_bytes = base64.b64decode(config_base64)
-        # Create a new unique directory for writing feature_store.yaml
-        repo_path = Path(tempfile.mkdtemp())
-        with open(repo_path / "feature_store.yaml", "wb") as f:
-            f.write(config_bytes)
-        store = FeatureStore(repo_path=str(repo_path.resolve()))
-    else:
-        fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-        cli_check_repo(repo, fs_yaml_file)
-        store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store.serve(
+        host=host,
+        port=port,
+        type_=type_,
+        no_access_log=no_access_log,
+        no_feature_log=no_feature_log,
+        workers=workers,
+        keep_alive_timeout=keep_alive_timeout,
+    )
 
-    store.serve(host, port, type_, no_access_log, no_feature_log)
-
+@cli.command("listen")
+@click.option(
+    "--address",
+    "-a",
+    type=click.STRING,
+    default="localhost:50051",
+    show_default=True,
+    help="Address of the gRPC server",
+)
+@click.option(
+    "--max_workers",
+    "-w",
+    type=click.INT,
+    default=10,
+    show_default=False,
+    help="The maximum number of threads that can be used to execute the gRPC calls",
+)
+@click.pass_context
+def listen_command(
+    ctx: click.Context,
+    address: str,
+    max_workers: int,
+):
+    """Start a gRPC feature server to ingest streaming features on given address"""
+    store = create_feature_store(ctx)
+    server = get_grpc_server(address, store, max_workers)
+    server.start()
+    server.wait_for_termination()
 
 @cli.command("serve_transformations")
 @click.option(
@@ -727,10 +737,7 @@ def serve_command(
 @click.pass_context
 def serve_transformations_command(ctx: click.Context, port: int):
     """[Experimental] Start a feature consumption server locally on a given port."""
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
 
     store.serve_transformations(port)
 
@@ -767,10 +774,7 @@ def validate(
 
     START_TS and END_TS should be in ISO 8601 format, e.g. '2021-07-16T19:20:01'
     """
-    repo = ctx.obj["CHDIR"]
-    fs_yaml_file = ctx.obj["FS_YAML_FILE"]
-    cli_check_repo(repo, fs_yaml_file)
-    store = FeatureStore(repo_path=str(repo), fs_yaml_file=fs_yaml_file)
+    store = create_feature_store(ctx)
 
     feature_service = store.get_feature_service(name=feature_service)
     reference = store.get_validation_reference(reference)

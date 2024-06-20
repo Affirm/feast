@@ -327,7 +327,7 @@ class MsSqlServerRetrievalJob(RetrievalJob):
         engine: Engine,
         config: MsSqlServerOfflineStoreConfig,
         full_feature_names: bool,
-        on_demand_feature_views: Optional[List[OnDemandFeatureView]],
+        on_demand_feature_views: Optional[List[OnDemandFeatureView]] = None,
         metadata: Optional[RetrievalMetadata] = None,
         drop_columns: Optional[List[str]] = None,
     ):
@@ -347,16 +347,21 @@ class MsSqlServerRetrievalJob(RetrievalJob):
     def on_demand_feature_views(self) -> List[OnDemandFeatureView]:
         return self._on_demand_feature_views
 
-    def _to_df_internal(self) -> pandas.DataFrame:
+    def _to_df_internal(self, timeout: Optional[int] = None) -> pandas.DataFrame:
         return pandas.read_sql(self.query, con=self.engine).fillna(value=np.nan)
 
-    def _to_arrow_internal(self) -> pyarrow.Table:
+    def _to_arrow_internal(self, timeout: Optional[int] = None) -> pyarrow.Table:
         result = pandas.read_sql(self.query, con=self.engine).fillna(value=np.nan)
         return pyarrow.Table.from_pandas(result)
 
     ## Implements persist in Feast 0.18 - This persists to filestorage
     ## ToDo: Persist to Azure Storage
-    def persist(self, storage: SavedDatasetStorage, allow_overwrite: bool = False):
+    def persist(
+        self,
+        storage: SavedDatasetStorage,
+        allow_overwrite: Optional[bool] = False,
+        timeout: Optional[int] = None,
+    ):
         assert isinstance(storage, SavedDatasetFileStorage)
 
         filesystem, path = FileSource.create_filesystem_and_path(

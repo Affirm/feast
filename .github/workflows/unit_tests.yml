@@ -18,26 +18,24 @@ jobs:
       OS: ${{ matrix.os }}
       PYTHON: ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Setup Python
         id: setup-python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
-      - name: Setup Go
-        id: setup-go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.18.0
       - name: Install mysql on macOS
         if:  startsWith(matrix.os, 'macOS')
         run: |
           brew install mysql
           PATH=$PATH:/usr/local/mysql/bin
-      - name: Upgrade pip version
+      - name: Work around Homebrew MySQL being broken
+        # See https://github.com/Homebrew/homebrew-core/issues/130258 for more details.
+        if:  startsWith(matrix.os, 'macOS')
         run: |
-          pip install --upgrade "pip>=22.1,<23"
+          brew install zlib
+          ln -sv $(brew --prefix zlib)/lib/libz.dylib $(brew --prefix)/lib/libzlib.dylib
       - name: Get pip cache dir
         id: pip-cache
         run: |
@@ -52,60 +50,24 @@ jobs:
           key: ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-pip-${{ hashFiles(format('**/py{0}-ci-requirements.txt', env.PYTHON)) }}
           restore-keys: |
             ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-pip-
+      - name: Upgrade pip version
+        run: |
+          pip install --upgrade "pip>=21.3.1,<23.2"
       - name: Install pip-tools
         run: pip install pip-tools
-      - name: Install apache-arrow on ubuntu
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-            sudo apt update
-            sudo apt install -y -V ca-certificates lsb-release wget
-            wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-            sudo apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-            sudo apt update
-            sudo apt install -y -V libarrow-dev
-      - name: Install apache-arrow on macos
-        if: matrix.os == 'macOS-latest'
-        run: brew install apache-arrow
       - name: Install dependencies
         run: make install-python-ci-dependencies
       - name: Test Python
         run: pytest -n 8 --cov=./ --cov-report=xml --color=yes sdk/python/tests
 
-  unit-test-go:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup Python
-        id: setup-python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.8"
-      - name: Upgrade pip version
-        run: |
-          pip install --upgrade "pip>=22.1,<23"
-      - name: Setup Go
-        id: setup-go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.18.0
-      - name: Install apache-arrow on ubuntu
-        run: |
-            sudo apt update
-            sudo apt install -y -V ca-certificates lsb-release wget
-            wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-            sudo apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-            sudo apt update
-            sudo apt install -y -V libarrow-dev
-      - name: Test
-        run: make test-go
 
   unit-test-ui:
     runs-on: ubuntu-latest
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: '17.x'
           registry-url: 'https://registry.npmjs.org'
