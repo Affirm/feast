@@ -133,6 +133,7 @@ class MySQLOnlineStore(OnlineStore):
                     return False
         return False
 
+
     def online_write_batch(
             self,
             config: RepoConfig,
@@ -175,6 +176,81 @@ class MySQLOnlineStore(OnlineStore):
                                                values=query_values,
                                                retries=MYSQL_WRITE_RETRIES)
         self._close_conn(raw_conn, conn_type)
+
+    def online_write_batch_occ(
+            self,
+            config: RepoConfig,
+            table: FeatureView,
+            data: List[
+                Tuple[EntityKeyProto, Dict[str, ValueProto], datetime, Optional[datetime]]
+            ],
+            progress: Optional[Callable[[int], Any]],
+    ) -> None:
+        logging.info("Using the OCC write function in mysql store")
+        raw_conn, conn_type = self._get_conn(config)
+        conn = raw_conn.connection if conn_type == ConnectionType.SESSION else raw_conn
+        with conn.cursor() as cur:
+            project = config.project
+
+            for entity_key, values, timestamp, created_ts in data:
+                entity_key_bin = serialize_entity_key(
+                    entity_key,
+                    entity_key_serialization_version=2,
+                ).hex()
+                timestamp = _to_naive_utc(timestamp)
+                if created_ts is not None:
+                    created_ts = _to_naive_utc(created_ts)
+
+                for i in range(MYSQL_WRITE_RETRIES):
+                    try:
+                        select_query = f"SELECT version FROM {_table_id(project, table)} WHERE entity_key = %s"
+                        cur.execute(select_query, (entity_key_bin,))
+                        result = cur.fetchone()
+
+                        if result is not None:
+                            current_version = result['version']
+                        else:
+                            current_version = -1
+
+                        updated_version = current_version + 1
+                        rows_to_insert = [
+                            (entity_key_bin, feature_name, val.SerializeToString(), timestamp, created_ts,
+                             updated_version)
+                            for feature_name, val in values.items()]
+                        value_formatters = ', '.join(['(%s, %s, %s, %s, %s, %s)'] * len(rows_to_insert))
+                        query = f"""
+                              INSERT INTO {_table_id(project, table)}
+                              (entity_key, feature_name, value, event_ts, created_ts, version)
+                              VALUES {value_formatters}
+                              ON DUPLICATE KEY UPDATE
+                              value = IF(version = %s, VALUES(value), value),
+                              event_ts = IF(version = %s, VALUES(event_ts), event_ts),
+                              created_ts = IF(version = %s, VALUES(created_ts), created_ts),
+                              version = IF(version = %s, VALUES(version), version)
+                              """
+                        query_values = [item for row in rows_to_insert for item in row] + [current_version] * 4
+
+                        cur.execute(query, query_values)
+                        affected_rows = cur.rowcount
+                        if affected_rows > 0:
+                            conn.commit()
+                            self._close_conn(raw_conn, conn_type)
+                            return
+                        else:
+                            logging.warning(f"0 rows updated potentially due to version conflict. Try {i}.")
+                            conn.rollback()
+                            if i == MYSQL_WRITE_RETRIES-1:
+                                raise RuntimeError(
+                                    f"Failed to write to the database after {MYSQL_WRITE_RETRIES} attempts")
+                            else:
+                                continue
+                    except pymysql.Error as e:
+                        logging.error("Error %d: %s" % (e.args[0], e.args[1]))
+                        conn.rollback()
+                        if i == MYSQL_WRITE_RETRIES-1:
+                            raise
+                        if e.args[0] == MYSQL_DEADLOCK_ERR:
+                            time.sleep(0.2)
 
     def bulk_insert(
             self,
