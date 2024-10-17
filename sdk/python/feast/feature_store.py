@@ -1486,6 +1486,7 @@ x
         feature_view_name: str,
         df: pd.DataFrame,
         allow_registry_cache: bool = True,
+        use_versioning: bool = False,
     ):
         """
         Persists a dataframe to the online store.
@@ -1505,7 +1506,7 @@ x
                 feature_view_name, allow_registry_cache=allow_registry_cache
             )
         provider = self._get_provider()
-        provider.ingest_df(feature_view, df)
+        provider.ingest_df(feature_view, df, use_versioning)
 
 
     @log_exceptions_and_usage

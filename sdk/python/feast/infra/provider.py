@@ -125,6 +125,7 @@ class Provider(ABC):
         self,
         feature_view: FeatureView,
         df: pd.DataFrame,
+        use_versioning: bool = False
     ):
         """
         Persists a dataframe to the online store.
@@ -132,6 +133,7 @@ class Provider(ABC):
         Args:
             feature_view: The feature view to which the dataframe corresponds.
             df: The dataframe to be persisted.
+            use_versioning: If true, write to the online store with a version check (to implement optimistic concurrency control).
         """
         pass
 

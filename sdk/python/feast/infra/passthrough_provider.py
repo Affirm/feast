@@ -160,6 +160,19 @@ class PassthroughProvider(Provider):
         if self.online_store:
             self.online_store.online_write_batch(config, table, data, progress)
 
+    def online_write_batch_occ(
+        self,
+        config: RepoConfig,
+        table: FeatureView,
+        data: List[
+            Tuple[EntityKeyProto, Dict[str, ValueProto], datetime, Optional[datetime]]
+        ],
+        progress: Optional[Callable[[int], Any]],
+    ) -> None:
+        set_usage_attribute("provider", self.__class__.__name__)
+        if self.online_store:
+            self.online_store.online_write_batch_occ(config, table, data, progress)
+
     def offline_write_batch(
         self,
         config: RepoConfig,
@@ -238,14 +251,20 @@ class PassthroughProvider(Provider):
         return _convert_arrow_to_proto(table, feature_view, join_keys)
 
     def ingest_df(
-        self,
-        feature_view: FeatureView,
-        df: pd.DataFrame,
+            self,
+            feature_view: FeatureView,
+            df: pd.DataFrame,
+            use_versioning: bool = False
     ):
         rows_to_write = self._unpack_df(feature_view, df)
-        self.online_write_batch(
-            self.repo_config, feature_view, rows_to_write, progress=None
-        )
+        if use_versioning:
+            self.online_write_batch_occ(
+                self.repo_config, feature_view, rows_to_write, progress=None
+            )
+        else:
+            self.online_write_batch(
+                self.repo_config, feature_view, rows_to_write, progress=None
+            )
 
     def materialize_single_feature_view(
         self,
