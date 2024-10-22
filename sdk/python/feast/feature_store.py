@@ -1442,6 +1442,7 @@ x
         df: pd.DataFrame,
         allow_registry_cache: bool = True,
         to: PushMode = PushMode.ONLINE,
+        use_versioning: bool = False,
     ):
         """
         Push features to a push source. This updates all the feature views that have the push source as stream source.
@@ -1473,7 +1474,7 @@ x
         for fv in fvs_with_push_sources:
             if to == PushMode.ONLINE or to == PushMode.ONLINE_AND_OFFLINE:
                 self.write_to_online_store(
-                    fv.name, df, allow_registry_cache=allow_registry_cache
+                    fv.name, df, allow_registry_cache=allow_registry_cache, use_versioning=use_versioning
                 )
             if to == PushMode.OFFLINE or to == PushMode.ONLINE_AND_OFFLINE:
                 self.write_to_offline_store(

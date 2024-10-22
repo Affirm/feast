@@ -208,7 +208,7 @@ class MySQLOnlineStore(OnlineStore):
                         result = cur.fetchone()
 
                         if result is not None:
-                            current_version = result['version']
+                            current_version = result[0]
                         else:
                             current_version = -1
 
