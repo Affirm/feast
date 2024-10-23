@@ -20,6 +20,8 @@ from feast.protos.feast.types.EntityKey_pb2 import EntityKey as EntityKeyProto
 from feast.protos.feast.types.Value_pb2 import Value as ValueProto
 from feast.repo_config import FeastConfigBaseModel
 
+logger = logging.getLogger(__name__)
+
 MYSQL_DEADLOCK_ERR = 1213
 MYSQL_WRITE_RETRIES = 3
 MYSQL_READ_RETRIES = 3
@@ -129,7 +131,7 @@ class MySQLOnlineStore(OnlineStore):
                     time.sleep(0.5)
                 else:
                     conn.rollback()
-                    logging.error("Error %d: %s" % (e.args[0], e.args[1]))
+                    logger.error("Error %d: %s" % (e.args[0], e.args[1]))
                     return False
         return False
 
@@ -186,7 +188,7 @@ class MySQLOnlineStore(OnlineStore):
             ],
             progress: Optional[Callable[[int], Any]],
     ) -> None:
-        logging.info("Using the OCC write function in mysql store")
+        logger.info("Using the OCC write function in mysql store")
         raw_conn, conn_type = self._get_conn(config)
         conn = raw_conn.connection if conn_type == ConnectionType.SESSION else raw_conn
         with conn.cursor() as cur:
@@ -237,7 +239,7 @@ class MySQLOnlineStore(OnlineStore):
                             self._close_conn(raw_conn, conn_type)
                             return
                         else:
-                            logging.warning(f"0 rows updated potentially due to version conflict. Try {i}.")
+                            logger.warning(f"0 rows updated potentially due to version conflict. Try {i}.")
                             conn.rollback()
                             if i == MYSQL_WRITE_RETRIES-1:
                                 raise RuntimeError(
@@ -245,7 +247,7 @@ class MySQLOnlineStore(OnlineStore):
                             else:
                                 continue
                     except pymysql.Error as e:
-                        logging.error("Error %d: %s" % (e.args[0], e.args[1]))
+                        logger.error("Error %d: %s" % (e.args[0], e.args[1]))
                         conn.rollback()
                         if i == MYSQL_WRITE_RETRIES-1:
                             raise
@@ -331,7 +333,7 @@ class MySQLOnlineStore(OnlineStore):
                     else:
                         result.append((res_ts, res))
                 else:
-                    logging.error(f'Skipping read for (entity, table)): ({entity_key}, {_table_id(project, table)})')
+                    logger.error(f'Skipping read for (entity, table)): ({entity_key}, {_table_id(project, table)})')
         self._close_conn(raw_conn, conn_type)
         return result
 
@@ -362,7 +364,7 @@ class MySQLOnlineStore(OnlineStore):
 
                 if not query_executed:
                     corresponding_records_deleted = False
-                    logging.error(f'Skipping delete for (entity, table)): ({entity_key}, {_table_id(project, table)})')
+                    logger.error(f'Skipping delete for (entity, table)): ({entity_key}, {_table_id(project, table)})')
         self._close_conn(raw_conn, conn_type)
         return corresponding_records_deleted
 
@@ -416,7 +418,7 @@ class MySQLOnlineStore(OnlineStore):
                     output.append(result)
             else:
                 for table, entity_keys in zip(table_list, entity_keys_list):
-                    logging.error(f'Skipping read for (table, entities): ({_table_id(project, table)}, {entity_keys})')
+                    logger.error(f'Skipping read for (table, entities): ({_table_id(project, table)}, {entity_keys})')
         self._close_conn(raw_conn, conn_type)
         return output
 
@@ -461,7 +463,7 @@ class MySQLOnlineStore(OnlineStore):
                     conn.commit()
                 except pymysql.Error as e:
                     conn.rollback()
-                    logging.error("Error %d: %s" % (e.args[0], e.args[1]))
+                    logger.error("Error %d: %s" % (e.args[0], e.args[1]))
 
             for table in tables_to_delete:
                 try:
@@ -469,7 +471,7 @@ class MySQLOnlineStore(OnlineStore):
                     conn.commit()
                 except pymysql.Error as e:
                     conn.rollback()
-                    logging.error("Error %d: %s" % (e.args[0], e.args[1]))
+                    logger.error("Error %d: %s" % (e.args[0], e.args[1]))
         self._close_conn(raw_conn, conn_type)
 
     def clear_table(
@@ -486,7 +488,7 @@ class MySQLOnlineStore(OnlineStore):
                 conn.commit()
             except pymysql.Error as e:
                 conn.rollback()
-                logging.error("Error %d: %s"
+                logger.error("Error %d: %s"
                               "" % (e.args[0], e.args[1]))
         self._close_conn(raw_conn, conn_type)
 
@@ -506,7 +508,7 @@ class MySQLOnlineStore(OnlineStore):
                     conn.commit()
                 except pymysql.Error as e:
                     conn.rollback()
-                    logging.error("Error %d: %s"
+                    logger.error("Error %d: %s"
                                   "" % (e.args[0], e.args[1]))
         self._close_conn(raw_conn, conn_type)
 
