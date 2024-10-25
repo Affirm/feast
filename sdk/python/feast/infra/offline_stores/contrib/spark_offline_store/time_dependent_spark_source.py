@@ -157,11 +157,11 @@ class TimeDependentSparkSource(SparkSource):
             raise AssertionError("Could not find an active spark session.")
         try:
             df = spark_session.read.format(self.file_format).load(*paths)
-        except Exception:
-            logger.exception(
-                "Spark read of file source failed.\n" + traceback.format_exc()
-            )
-        tmp_table_name = get_temp_entity_table_name()
-        df.createOrReplaceTempView(tmp_table_name)
+            tmp_table_name = get_temp_entity_table_name()
+            df.createOrReplaceTempView(tmp_table_name)
 
-        return f"`{tmp_table_name}`"
+            return f"`{tmp_table_name}`"
+        except Exception as e:
+            msg = "Spark read of file source failed.\n" + traceback.format_exc()
+            logger.exception(msg)
+            raise Exception(msg) from e
