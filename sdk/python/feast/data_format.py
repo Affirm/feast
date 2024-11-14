@@ -47,6 +47,10 @@ class FileFormat(ABC):
             return None
         raise NotImplementedError(f"FileFormat is unsupported: {fmt}")
 
+    @abstractmethod
+    def __copy__(self):
+        pass
+
     def __str__(self):
         """
         String representation of the file format passed to spark
@@ -62,6 +66,9 @@ class ParquetFormat(FileFormat):
     def to_proto(self):
         return FileFormatProto(parquet_format=FileFormatProto.ParquetFormat())
 
+    def __copy__(self):
+        return ParquetFormat()
+
     def __str__(self):
         return "parquet"
 
@@ -76,6 +83,10 @@ class StreamFormat(ABC):
         """
         Convert this StreamFormat into its protobuf representation.
         """
+        pass
+
+    @abstractmethod
+    def __copy__(self):
         pass
 
     def __eq__(self, other):
@@ -114,6 +125,9 @@ class AvroFormat(StreamFormat):
         proto = StreamFormatProto.AvroFormat(schema_json=self.schema_json)
         return StreamFormatProto(avro_format=proto)
 
+    def __copy__(self):
+        return AvroFormat(self.schema_json)
+
 
 class JsonFormat(StreamFormat):
     """
@@ -136,6 +150,9 @@ class JsonFormat(StreamFormat):
         proto = StreamFormatProto.JsonFormat(schema_json=self.schema_json)
         return StreamFormatProto(json_format=proto)
 
+    def __copy__(self):
+        return JsonFormat(self.schema_json)
+
 
 class ProtoFormat(StreamFormat):
     """
@@ -155,3 +172,6 @@ class ProtoFormat(StreamFormat):
         return StreamFormatProto(
             proto_format=StreamFormatProto.ProtoFormat(class_path=self.class_path)
         )
+
+    def __copy__(self):
+        return ProtoFormat(self.class_path)

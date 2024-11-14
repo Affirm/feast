@@ -148,12 +148,15 @@ class OnDemandFeatureView(BaseFeatureView):
     def proto_class(self) -> Type[OnDemandFeatureViewProto]:
         return OnDemandFeatureViewProto
 
-    def __copy__(self):
+    def __copy__(self) -> "OnDemandFeatureView":
         fv = OnDemandFeatureView(
             name=self.name,
-            schema=self.features,
-            sources=list(self.source_feature_view_projections.values())
-            + list(self.source_request_sources.values()),
+            schema=[copy.copy(feature) for feature in self.features],
+            source=[
+                copy.copy(projection) for projection in self.source_feature_view_projections.values()
+            ] + [
+                copy.copy(source) for source in self.source_request_sources.values()
+            ],
             udf=self.udf,
             udf_string=self.udf_string,
             mode=self.mode,
@@ -162,6 +165,8 @@ class OnDemandFeatureView(BaseFeatureView):
             owner=self.owner,
         )
         fv.projection = copy.copy(self.projection)
+        fv.last_updated_timestamp = self.last_updated_timestamp
+        fv.created_timestamp = self.created_timestamp
         return fv
 
     def __eq__(self, other):

@@ -1,3 +1,4 @@
+import copy
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 from pyarrow._fs import FileSystem
@@ -277,6 +278,13 @@ class SavedDatasetFileStorage(SavedDatasetStorage):
     def to_proto(self) -> SavedDatasetStorageProto:
         return SavedDatasetStorageProto(file_storage=self.file_options.to_proto())
 
+    def __copy__(self) -> "SavedDatasetFileStorage":
+        return SavedDatasetFileStorage(
+            path=self.file_options.uri,
+            file_format=copy.copy(self.file_options.file_format),
+            s3_endpoint_override=self.file_options.s3_endpoint_override
+        )
+
     def to_data_source(self) -> DataSource:
         return FileSource(
             path=self.file_options.uri,
@@ -331,6 +339,13 @@ class FileLoggingDestination(LoggingDestination):
                 s3_endpoint_override=self.s3_endpoint_override,
                 partition_by=self.partition_by,
             )
+        )
+
+    def __copy__(self) -> "LoggingDestination":
+        return FileLoggingDestination(
+            path=self.path,
+            s3_endpoint_override=self.s3_endpoint_override,
+            partition_by=list(self.partition_by)
         )
 
     def to_data_source(self) -> DataSource:

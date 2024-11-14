@@ -205,6 +205,17 @@ class MsSqlServerSource(DataSource):
         data_source_proto.name = self.name
         return data_source_proto
 
+    def __copy__(self):
+        return MsSqlServerSource(
+            name=self.name,
+            field_mapping=dict(self.field_mapping),
+            table_ref=self._mssqlserver_options.table_ref,
+            connection_str=self._mssqlserver_options.connection_str,
+            event_timestamp_column=self.timestamp_field,
+            created_timestamp_column=self.created_timestamp_column,
+            date_partition_column=self.date_partition_column,
+        )
+
     def get_table_query_string(self) -> str:
         """Returns a string that can directly be used to reference this table in SQL"""
         return f"`{self.table_ref}`"

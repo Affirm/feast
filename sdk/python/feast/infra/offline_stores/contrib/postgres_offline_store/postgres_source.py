@@ -100,6 +100,19 @@ class PostgreSQLSource(DataSource):
 
         return data_source_proto
 
+    def __copy__(self):
+        return PostgreSQLSource(
+            name=self._postgres_options._name,
+            query=self._postgres_options._query,
+            table=self._postgres_options._table,
+            field_mapping=dict(self.field_mapping),
+            timestamp_field=self.timestamp_field,
+            created_timestamp_column=self.created_timestamp_column,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner,
+        )
+
     def validate(self, config: RepoConfig):
         pass
 

@@ -1,4 +1,5 @@
 import abc
+import copy
 from typing import TYPE_CHECKING, Dict, Optional, Type, cast
 
 import pyarrow as pa
@@ -174,3 +175,9 @@ class LoggingConfig:
         proto = self.destination.to_proto()
         proto.sample_rate = self.sample_rate
         return proto
+
+    def __copy__(self) -> "LoggingConfig":
+        return LoggingConfig(
+            destination=copy.copy(self.destination),
+            sample_rate=self.sample_rate
+        )

@@ -320,6 +320,9 @@ class SavedDatasetRedshiftStorage(SavedDatasetStorage):
             redshift_storage=self.redshift_options.to_proto()
         )
 
+    def __copy__(self) -> "SavedDatasetRedshiftStorage":
+        return SavedDatasetRedshiftStorage(table_ref=self.redshift_options.table)
+
     def to_data_source(self) -> DataSource:
         return RedshiftSource(table=self.redshift_options.table)
 
@@ -344,6 +347,9 @@ class RedshiftLoggingDestination(LoggingDestination):
                 table_name=self.table_name
             )
         )
+
+    def __copy__(self) -> "RedshiftLoggingDestination":
+        return RedshiftLoggingDestination(table_name=self.table_name)
 
     def to_data_source(self) -> DataSource:
         return RedshiftSource(table=self.table_name)

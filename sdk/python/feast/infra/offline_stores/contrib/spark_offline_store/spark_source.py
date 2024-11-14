@@ -176,6 +176,20 @@ class SparkSource(DataSource):
 
         return data_source_proto
 
+    def __copy__(self):
+        return SparkSource(
+            name=self.name,
+            field_mapping=dict(self.field_mapping),
+            table=self.spark_options.table,
+            query=self.spark_options.query,
+            path=self.spark_options.path,
+            file_format=self.spark_options.file_format,
+            created_timestamp_column=self.created_timestamp_column,
+            description=self.description,
+            tags=dict(self.tags),
+            owner=self.owner
+        )
+
     def validate(self, config: RepoConfig):
         # RB: Disable this, possibly temporarily. This is an expensive operation to run on an RPC pod.
         # self.get_table_column_names_and_types(config)

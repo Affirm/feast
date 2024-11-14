@@ -259,6 +259,11 @@ class SavedDatasetBigQueryStorage(SavedDatasetStorage):
             bigquery_storage=self.bigquery_options.to_proto()
         )
 
+    def __copy__(self) -> "SavedDatasetBigQueryStorage":
+        return SavedDatasetBigQueryStorage(
+            table=self.bigquery_options.table
+        )
+
     def to_data_source(self) -> DataSource:
         return BigQuerySource(table=self.bigquery_options.table)
 
@@ -286,3 +291,6 @@ class BigQueryLoggingDestination(LoggingDestination):
                 table_ref=self.table
             )
         )
+
+    def __copy__(self) -> "LoggingDestination":
+        return BigQueryLoggingDestination(table_ref=self.table)

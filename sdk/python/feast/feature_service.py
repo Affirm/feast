@@ -1,3 +1,4 @@
+import copy
 from datetime import datetime
 from typing import Dict, List, Optional, Union
 
@@ -248,6 +249,22 @@ class FeatureService:
         )
 
         return FeatureServiceProto(spec=spec, meta=meta)
+
+    def __copy__(self) -> "FeatureService":
+        fs = FeatureService(
+            name=self.name,
+            features=[],
+            tags=dict(self.tags),
+            description=self.description,
+            owner=self.owner,
+            logging_config=copy.copy(self.logging_config)
+        )
+        fs.feature_view_projections.extend([
+            copy.copy(projection) for projection in self.feature_view_projections
+        ])
+        fs.created_timestamp = self.created_timestamp
+        fs.last_updated_timestamp = self.last_updated_timestamp
+        return fs
 
     def validate(self):
         pass

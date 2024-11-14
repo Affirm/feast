@@ -1,3 +1,4 @@
+import copy
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from attr import dataclass
@@ -63,11 +64,20 @@ class FeatureViewProjection:
 
         return feature_view_projection
 
+    def __copy__(self) -> "FeatureViewProjection":
+        return FeatureViewProjection(
+            name=self.name,
+            name_alias=self.name_alias,
+            join_key_map=dict(self.join_key_map),
+            desired_features=self.desired_features,
+            features=[copy.copy(feature) for feature in self.features]
+        )
+
     @staticmethod
     def from_definition(base_feature_view: "BaseFeatureView"):
         return FeatureViewProjection(
             name=base_feature_view.name,
-            name_alias=None,
+            name_alias="",
             features=base_feature_view.features,
             desired_features=[],
         )
