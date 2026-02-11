@@ -1,2 +1,3 @@
 fastapi
 mangum
+ci-metadata-python-logging==0.1.0
